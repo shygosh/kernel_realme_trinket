@@ -881,6 +881,7 @@ struct rq {
 	u64			rt_avg;
 	u64			age_stamp;
 	struct sched_avg	avg_rt;
+	struct sched_avg	avg_dl;
 	u64			idle_stamp;
 	u64			avg_idle;
 
@@ -2008,6 +2009,11 @@ static inline unsigned long task_util(struct task_struct *p)
 static inline unsigned long cpu_util_rt(struct rq *rq)
 {
 	return READ_ONCE(rq->avg_rt.util_avg);
+}
+
+static inline unsigned long cpu_util_dl(struct rq *rq)
+{
+	return READ_ONCE(rq->avg_dl.util_avg);
 }
 
 /**
