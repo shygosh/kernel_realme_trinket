@@ -878,10 +878,11 @@ struct rq {
 
 	struct list_head cfs_tasks;
 
-	u64 rt_avg;
-	u64 age_stamp;
-	u64 idle_stamp;
-	u64 avg_idle;
+	u64			rt_avg;
+	u64			age_stamp;
+	struct sched_avg	avg_rt;
+	u64			idle_stamp;
+	u64			avg_idle;
 
 	/* This is used to determine avg_idle's max value */
 	u64 max_idle_balance_cost;
@@ -2002,6 +2003,11 @@ static inline unsigned long task_util(struct task_struct *p)
 		return p->ravg.demand_scaled;
 #endif
 	return READ_ONCE(p->se.avg.util_avg);
+}
+
+static inline unsigned long cpu_util_rt(struct rq *rq)
+{
+	return READ_ONCE(rq->avg_rt.util_avg);
 }
 
 /**
