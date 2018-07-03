@@ -1005,7 +1005,7 @@
 
 		/* PM QoS */
 		qcom,pm-qos-cpu-groups = <0x0f 0xf0>;
-		qcom,pm-qos-cpu-group-latency-us = <26 26>;
+		qcom,pm-qos-cpu-group-latency-us = <44 44>;
 		qcom,pm-qos-default-cpu = <0>;
 
 		pinctrl-names = "dev-reset-assert", "dev-reset-deassert";
@@ -2182,10 +2182,10 @@
 
 		/* PM QoS */
 		qcom,pm-qos-irq-type = "affine_irq";
-		qcom,pm-qos-irq-latency = <40 40>;
+		qcom,pm-qos-irq-latency = <44 44>;
 		qcom,pm-qos-cpu-groups = <0x0f 0xf0>;
-		qcom,pm-qos-cmdq-latency-us = <40 40>, <40 40>;
-		qcom,pm-qos-legacy-latency-us = <40 40>, <40 40>;
+		qcom,pm-qos-cmdq-latency-us = <44 44>, <44 44>;
+		qcom,pm-qos-legacy-latency-us = <44 44>, <44 44>;
 
 		qcom,scaling-lower-bus-speed-mode = "DDR52";
 
@@ -2254,9 +2254,9 @@
 
 		/* PM QoS */
 		qcom,pm-qos-irq-type = "affine_irq";
-		qcom,pm-qos-irq-latency = <40 40>;
+		qcom,pm-qos-irq-latency = <44 44>;
 		qcom,pm-qos-cpu-groups = <0x0f 0xf0>;
-		qcom,pm-qos-legacy-latency-us = <40 40>, <40 40>;
+		qcom,pm-qos-legacy-latency-us = <44 44>, <44 44>;
 
 		clocks = <&clock_gcc GCC_SDCC2_AHB_CLK>,
 			<&clock_gcc GCC_SDCC2_APPS_CLK>;
