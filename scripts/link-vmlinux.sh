@@ -125,7 +125,7 @@ modpost_link()
 		info LD vmlinux.o
 	fi
 
-	${LD} ${LDFLAGS} -r -o ${1} $(lto_lds) ${objects}
+	${LD} ${KBUILD_LDFLAGS} -r -o ${1} $(lto_lds) ${objects}
 }
 
 # If CONFIG_LTO_CLANG is selected, we postpone running recordmcount until
@@ -151,7 +151,7 @@ vmlinux_link()
 
 	if [ "${SRCARCH}" != "um" ]; then
 		local ld=${LD}
-		local ldflags="${LDFLAGS} ${LDFLAGS_vmlinux}"
+		local ldflags="${KBUILD_LDFLAGS} ${LDFLAGS_vmlinux}"
 
 		if [ -n "${LDFINAL_vmlinux}" ]; then
 			ld=${LDFINAL_vmlinux}
