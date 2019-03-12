@@ -589,6 +589,16 @@ static int __init parse_rodata(char *arg)
 early_param("rodata", parse_rodata);
 
 #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+static phys_addr_t pgd_kernel_pgtable_alloc(int shift)
+{
+        void *ptr = (void *)__get_free_page(PGALLOC_GFP);
+        BUG_ON(!ptr);
+
+        /* Ensure the zeroed page is visible to the page table walker */
+        dsb(ishst);
+        return __pa(ptr);
+}
+
 static int __init map_entry_trampoline(void)
 {
 	int i;
@@ -603,7 +613,7 @@ static int __init map_entry_trampoline(void)
 	/* Map only the text into the trampoline page table */
 	memset(tramp_pg_dir, 0, PGD_SIZE);
 	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS,
-			     entry_tramp_text_size(), prot, pgd_pgtable_alloc,
+			     entry_tramp_text_size(), prot, pgd_kernel_pgtable_alloc,
 			     0);
 
 	/* Map both the text and data into the kernel page table */
