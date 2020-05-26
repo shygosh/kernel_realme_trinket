@@ -791,6 +791,9 @@ struct rq {
 	unsigned long last_sched_tick;
 #endif
 	unsigned long nr_load_updates;
+#ifdef CONFIG_SMP
+	unsigned int		ttwu_pending;
+#endif
 	u64 nr_switches;
 
 	struct cfs_rq cfs;
