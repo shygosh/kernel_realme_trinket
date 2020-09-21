@@ -9079,8 +9079,7 @@ redo:
 		 * scheduler fails to find a good waiting task to
 		 * migrate.
 		 */
-		if (load / 2 > env->imbalance &&
-		    env->sd->nr_balance_failed <= env->sd->cache_nice_tries)
+		if ((load >> env->sd->nr_balance_failed) > env->imbalance)
 			goto next;
 
 		detach_task(p, env);
