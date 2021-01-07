@@ -10391,6 +10391,9 @@ static struct rq *find_busiest_queue(struct lb_env *env,
 		if (rt > env->fbq_type)
 			continue;
 
+		if (!rq->cfs.h_nr_running)
+			continue;
+
 		/*
 		 * For ASYM_CPUCAPACITY domains with misfit tasks we simply
 		 * seek the "biggest" misfit task.
