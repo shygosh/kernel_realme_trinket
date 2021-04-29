@@ -1,0 +1,44 @@
+#include "qcom-base/trinket-idp.dtsi"
+#include "realme-trinket-audio.dtsi"
+#include "realme-trinket-battery.dtsi"
+#include "realme-trinket-camera.dtsi"
+#include "realme-trinket-display.dtsi"
+#include "realme-trinket-fingerprint.dtsi"
+#include "realme-trinket-memory.dtsi"
+#include "realme-trinket-pinctrl.dtsi"
+#include "realme-trinket-pm6125.dtsi"
+#include "realme-trinket-pmi632.dtsi"
+#include "realme-trinket-regulator.dtsi"
+#include "realme-trinket-touchscreen.dtsi"
+#include "realme-trinket-thermal.dtsi"
+#include "realme-trinket-usb.dtsi"
+
+&firmware {
+	android {
+		vbmeta {
+			parts = "vbmeta,boot,system,vendor,dtbo,recovery,odm";
+		};
+
+		fstab {
+			vendor {
+				dev = "/dev/block/platform/soc/4744000.sdhci/by-name/vendor";
+				mnt_flags = "ro,barrier=1";
+				fsmgr_flags = "wait";
+			};
+		};
+	};
+};
+
+&sdhc_2 {
+	cd-gpios = <&tlmm 98 GPIO_ACTIVE_HIGH>;
+};
+
+&soc {
+	devinfo {
+		compatible = "oppo-devinfo";
+		io-channel-names = "sub_adc_gpio3";
+		io-channels = <&pmi632_vadc ADC_GPIO2_PU2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sub_mainboard_default>;
+	};
+};

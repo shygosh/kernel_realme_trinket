@@ -1,0 +1,22 @@
+&mtp_batterydata {
+	qcom,batt-id-range-pct = <19>;
+	#include "oppo_battery_4910mah_68k_pmi632_atl.dtsi"
+	#include "oppo_battery_5000mah_470k_pmi632_sdi.dtsi"
+	#include "oppo_battery_5000mah_15k_pmi632_cl.dtsi"
+};
+
+&pmi632_qg {
+	qcom,qg-iterm-ma = <320>;
+	qcom,cl-feedback-on;
+};
+
+&pmi632_charger {
+	/delete-property/ qcom,hw-die-temp-mitigation;
+	/delete-property/ qcom,hw-connector-mitigation;
+	/delete-property/ qcom,connector-internal-pull-kohm;
+
+	qcom,chg-term-src = <1>;
+	qcom,chg-term-current-ma = <(-250)>;
+	qcom,chg-term-base-current-ma = <(-200)>;
+  	qcom,flash-disable-soc = <1>;
+};
