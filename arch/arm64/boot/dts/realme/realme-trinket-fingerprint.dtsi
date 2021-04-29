@@ -1,0 +1,27 @@
+&soc {
+    oppo_fp_common { //Slave driver and CS ID
+        compatible = "oppo,fp_common"; //Manufacture, and Model
+        oppo,fp-id1 = <&tlmm 113 0x00>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&gpio_id1_default>;
+    };
+
+    oppo_secure_common { //Slave driver and CS ID
+        compatible = "oppo,secure_common"; //Manufacture, and Model
+    };
+
+    fpc_fpc1020 { //Slave driver and CS ID
+        compatible = "fpc,fpc1020"; //Manufacture, and Model
+        fpc,irq-gpio = <&tlmm 92 0x00>;
+        vdd_io-supply = <&L9A>;  // 1.8V
+        pinctrl-names = "default";
+        pinctrl-0 = <&gpio_fpc_irq_default>;
+    };
+    egis_fp520 { //Slave driver and CS ID
+        compatible = "egistec,et520";
+        //ldo7-supply = <&L7P>;  // pm8008_l7 for egis
+        egistec,gpio_rst = <&tlmm 93 0x00>;
+        egistec,gpio_irq = <&tlmm 92 0x00>;
+        egistec,gpio_pwr_en = <&tlmm 48 0x00>;
+    };
+};

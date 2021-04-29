@@ -1,0 +1,6 @@
+&thermal_zones {
+	/delete-node/ conn-therm-adc;
+	/delete-node/ pmi632-bcl-lvl0;
+	/delete-node/ pmi632-bcl-lvl1;
+	/delete-node/ pmi632-bcl-lvl2;
+};
