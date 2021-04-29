@@ -1,0 +1,72 @@
+&removed_region {
+	reg = <0 0x46200000 0 0x3800000>;
+};
+
+&pil_modem_mem {
+	reg = <0 0x6b000000 0 0x8e00000>;
+};
+
+&pil_video_mem {
+	reg = <0 0x73e00000 0 0x500000>;
+};
+
+&wlan_msa_mem {
+	reg = <0 0x74300000 0 0x200000>;
+};
+
+&pil_cdsp_mem {
+	reg = <0 0x74500000 0 0x1e00000>;
+};
+
+&pil_adsp_mem {
+	reg = <0 0x76300000 0 0x2000000>;
+};
+
+&pil_ipa_fw_mem {
+	reg = <0 0x78300000 0 0x10000>;
+};
+
+&pil_ipa_gsi_mem {
+	reg = <0 0x78310000 0 0x5000>;
+};
+
+&pil_gpu_mem {
+	reg = <0 0x78315000 0 0x2000>;
+};
+
+&wdog {
+	qcom,bark-time = <15000>;
+};
+
+&qcom_seecom {
+	reg = <0x46d00000 0x2d00000>;
+};
+
+&qcom_smcinvoke {
+	reg = <0x46d00000 0x2d00000>;
+};
+
+&soc {
+	sn_fuse: snfuse@0x1b46134 {
+		compatible = "qcom,sn-fuse";
+		reg = <0x1b46134 0x4>;
+		reg-names = "sn-base";
+	};
+
+	qcom,oembackup_sharedmem@0 {
+		compatible = "qcom,sharedmem-uio";
+		reg = <0x0 0x00100000>;
+		reg-names = "oembackup";
+		qcom,client-id = <0x00000004>;
+		qcom,guard-memory;
+		qcom,vm-nav-path;
+	};
+};
+
+&reserved_memory {
+	pil_camera_mem: camera_region@6ab00000 {
+		compatible = "removed-dma-pool";
+		no-map;
+		reg = <0 0x6ab00000 0 0x500000>;
+	};
+};
