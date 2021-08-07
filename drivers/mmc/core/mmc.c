@@ -906,7 +906,7 @@ static DEVICE_ATTR(dsr, S_IRUGO, mmc_dsr_show, NULL);
 static int calc_mem_size(void)
 {
 	int temp_size;
-	temp_size = (int)totalram_pages/1024; //page size 4K
+	temp_size = (int)totalram_pages() / 1024; //page size 4K
 	if ((temp_size > 0*256) && (temp_size <= 1*256))
 		return 1;
 	else if ((temp_size > 1*256) && (temp_size <= 2*256))
