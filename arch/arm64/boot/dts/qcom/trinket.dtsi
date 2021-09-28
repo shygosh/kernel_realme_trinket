@@ -1133,7 +1133,7 @@
 		qcom,eud-clock-vote-req;
 		clocks = <&clock_gcc GCC_AHB2PHY_USB_CLK>;
 		clock-names = "eud_ahb2phy_clk";
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,msm-gladiator-v2@f100000 {
