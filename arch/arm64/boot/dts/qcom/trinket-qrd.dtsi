@@ -296,7 +296,7 @@
 };
 
 &usb0 {
-	extcon = <&pmi632_charger>, <&eud>;
+	extcon = <&pmi632_charger>;
 };
 
 &dsi_td4330_truly_cmd {
