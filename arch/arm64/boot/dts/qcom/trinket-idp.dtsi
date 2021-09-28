@@ -162,7 +162,7 @@
 };
 
 &usb0 {
-	extcon = <&pmi632_charger>, <&eud>;
+	extcon = <&pmi632_charger>;
 };
 
 &pmi632_gpios {
