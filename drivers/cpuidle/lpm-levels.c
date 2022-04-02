@@ -1363,6 +1363,15 @@ static int lpm_cpuidle_select(struct cpuidle_driver *drv,
 		struct cpuidle_device *dev, bool *stop_tick)
 {
 	struct lpm_cpu *cpu = per_cpu(cpu_lpm, dev->cpu);
+#ifdef CONFIG_NO_HZ_COMMON
+	ktime_t delta_next;
+	s64 duration_ns = tick_nohz_get_sleep_length(&delta_next);
+#endif
+
+#ifdef CONFIG_NO_HZ_COMMON
+	if (duration_ns <= TICK_NSEC)
+		*stop_tick = false;
+#endif
 
 	if (!cpu)
 		return 0;
