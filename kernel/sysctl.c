@@ -340,6 +340,11 @@ static int min_extfrag_threshold;
 static int max_extfrag_threshold = 1000;
 #endif
 
+#ifndef CONFIG_SCHED_WALT
+static unsigned int dummy_sysctl_sched_boost;
+static unsigned int dummy_sysctl_sched_energy_aware = 1;
+#endif
+
 static struct ctl_table kern_table[] = {
 	{
 		.procname	= "sched_child_runs_first_alt",
@@ -454,6 +459,21 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= sched_little_cluster_coloc_fmin_khz_handler,
 		.extra1		= &zero,
 		.extra2		= &two_million,
+	},
+#else
+	{
+		.procname	= "sched_boost",
+		.data		= &dummy_sysctl_sched_boost,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "sched_energy_aware",
+		.data		= &dummy_sysctl_sched_energy_aware,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
 	},
 #endif
 	{
