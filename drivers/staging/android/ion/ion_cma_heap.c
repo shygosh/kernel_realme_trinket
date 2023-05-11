@@ -78,13 +78,6 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 	if (!info)
 		return -ENOMEM;
 
-	if (ion_heap_is_cma_heap_type(buffer->heap->type) &&
-	    is_secure_allocation(buffer->flags)) {
-		pr_err("%s: CMA heap doesn't support secure allocations\n",
-		       __func__);
-		return -EINVAL;
-	}
-
 	if (align > CONFIG_CMA_ALIGNMENT)
 		align = CONFIG_CMA_ALIGNMENT;
 
