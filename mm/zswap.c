@@ -43,6 +43,8 @@
 #include <linux/pagemap.h>
 #include <linux/workqueue.h>
 
+#include "internal.h"
+
 /*********************************
 * statistics
 **********************************/
@@ -535,9 +537,19 @@ static void shrink_worker(struct work_struct *w)
 {
 	struct zswap_pool *pool = container_of(w, typeof(*pool),
 						shrink_work);
+	int ret, failures = 0;
 
-	if (zpool_shrink(pool->zpool, 1, NULL))
-		zswap_reject_reclaim_fail++;
+	do {
+		ret = zpool_shrink(pool->zpool, 1, NULL);
+		if (ret) {
+			zswap_reject_reclaim_fail++;
+			if (ret != -EAGAIN)
+				break;
+			if (++failures == MAX_RECLAIM_RETRIES)
+				break;
+		}
+		cond_resched();
+	} while (!zswap_can_accept());
 	zswap_pool_put(pool);
 }
 
@@ -1089,6 +1101,7 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 	struct zswap_tree *tree = zswap_trees[type];
 	struct zswap_entry *entry, *dupentry;
 	struct crypto_comp *tfm;
+	struct zswap_pool *pool;
 	int ret;
 	unsigned int hlen, dlen = PAGE_SIZE;
 	unsigned long handle, value;
@@ -1110,8 +1123,6 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 
 	/* reclaim space if needed */
 	if (zswap_is_full()) {
-		struct zswap_pool *pool;
-
 		zswap_pool_limit_hit++;
 		zswap_pool_reached_full = true;
 		pool = zswap_pool_last_get();
@@ -1122,7 +1133,10 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 	}
 
 	if (zswap_pool_reached_full) {
-	       if (!zswap_can_accept()) {
+		if (!zswap_can_accept()) {
+			pool = zswap_pool_last_get();
+			if (pool)
+				queue_work(shrink_wq, &pool->shrink_work);
 			ret = -ENOMEM;
 			goto reject;
 		} else
