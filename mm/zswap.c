@@ -247,7 +247,8 @@ static bool zswap_has_pool;
 	pr_debug("%s pool %s/%s\n", msg, (p)->tfm_name,		\
 		 zpool_get_type((p)->zpool))
 
-static int zswap_writeback_entry(struct zpool *pool, unsigned long handle);
+static int zswap_writeback_entry(struct zswap_entry *entry, struct zswap_header *zhdr,
+				 struct zswap_tree *tree);
 static int zswap_pool_get(struct zswap_pool *pool);
 static void zswap_pool_put(struct zswap_pool *pool);
 
@@ -580,7 +581,7 @@ static int zswap_reclaim_entry(struct zswap_pool *pool)
 	zswap_entry_get(entry);
 	spin_unlock(&tree->lock);
 
-	ret = zswap_writeback_entry(pool->zpool, entry->handle);
+	ret = zswap_writeback_entry(entry, zhdr, tree);
 
 	spin_lock(&tree->lock);
 	if (ret) {
@@ -588,8 +589,17 @@ static int zswap_reclaim_entry(struct zswap_pool *pool)
 		spin_lock(&pool->lru_lock);
 		list_move(&entry->lru, &pool->lru);
 		spin_unlock(&pool->lru_lock);
+		goto put_unlock;
 	}
 
+	/* Check for invalidate() race */
+	if (entry != zswap_rb_search(&tree->rbroot, swpoffset))
+		goto put_unlock;
+
+	/* Drop base reference */
+	zswap_entry_put(tree, entry);
+
+put_unlock:
 	/* Drop local reference */
 	zswap_entry_put(tree, entry);
 unlock:
@@ -988,13 +998,10 @@ static int zswap_get_swap_cache_page(swp_entry_t entry,
  * the swap cache, the compressed version stored by zswap can be
  * freed.
  */
-static int zswap_writeback_entry(struct zpool *pool, unsigned long handle)
+static int zswap_writeback_entry(struct zswap_entry *entry, struct zswap_header *zhdr,
+				 struct zswap_tree *tree)
 {
-	struct zswap_header *zhdr;
-	swp_entry_t swpentry;
-	struct zswap_tree *tree;
-	pgoff_t offset;
-	struct zswap_entry *entry;
+	swp_entry_t swpentry = zhdr->swpentry;
 	struct page *page;
 	struct crypto_comp *tfm;
 	u8 *src, *dst, *tmp = NULL;
@@ -1003,31 +1010,13 @@ static int zswap_writeback_entry(struct zpool *pool, unsigned long handle)
 	struct writeback_control wbc = {
 		.sync_mode = WB_SYNC_NONE,
 	};
+	struct zpool *pool = entry->pool->zpool;
 
 	if (!zpool_can_sleep_mapped(pool)) {
 		tmp = kmalloc(PAGE_SIZE, GFP_KERNEL);
 		if (!tmp)
 			return -ENOMEM;
 	}
-
-	/* extract swpentry from data */
-	zhdr = zpool_map_handle(pool, handle, ZPOOL_MM_RO);
-	swpentry = zhdr->swpentry; /* here */
-	tree = zswap_trees[swp_type(swpentry)];
-	offset = swp_offset(swpentry);
-	zpool_unmap_handle(pool, handle);
-
-	/* find and ref zswap entry */
-	spin_lock(&tree->lock);
-	entry = zswap_entry_find_get(&tree->rbroot, offset);
-	if (!entry) {
-		/* entry was invalidated */
-		spin_unlock(&tree->lock);
-		kfree(tmp);
-		return 0;
-	}
-	spin_unlock(&tree->lock);
-	BUG_ON(offset != entry->offset);
 
 	/* try to allocate swap cache page */
 	switch (zswap_get_swap_cache_page(swpentry, &page)) {
@@ -1061,12 +1050,12 @@ static int zswap_writeback_entry(struct zpool *pool, unsigned long handle)
 		/* decompress */
 		dlen = PAGE_SIZE;
 
-		zhdr = zpool_map_handle(pool, handle, ZPOOL_MM_RO);
+		zhdr = zpool_map_handle(pool, entry->handle, ZPOOL_MM_RO);
 		src = (u8 *)zhdr + sizeof(struct zswap_header);
 		if (!zpool_can_sleep_mapped(pool)) {
 			memcpy(tmp, src, entry->length);
 			src = tmp;
-			zpool_unmap_handle(pool, handle);
+			zpool_unmap_handle(pool, entry->handle);
 		}
 
 		dst = kmap_atomic(page);
@@ -1079,7 +1068,7 @@ static int zswap_writeback_entry(struct zpool *pool, unsigned long handle)
 		if (!zpool_can_sleep_mapped(pool))
 			kfree(tmp);
 		else
-			zpool_unmap_handle(pool, handle);
+			zpool_unmap_handle(pool, entry->handle);
 
 		BUG_ON(ret);
 		BUG_ON(dlen != PAGE_SIZE);
@@ -1096,23 +1085,7 @@ static int zswap_writeback_entry(struct zpool *pool, unsigned long handle)
 	put_page(page);
 	zswap_written_back_pages++;
 
-	spin_lock(&tree->lock);
-	/* drop local reference */
-	zswap_entry_put(tree, entry);
-
-	/*
-	* There are two possible situations for entry here:
-	* (1) refcount is 1(normal case),  entry is valid and on the tree
-	* (2) refcount is 0, entry is freed and not on the tree
-	*     because invalidate happened during writeback
-	*  search the tree and free the entry if find entry
-	*/
-	if (entry == zswap_rb_search(&tree->rbroot, offset))
-		zswap_entry_put(tree, entry);
-	spin_unlock(&tree->lock);
-
 	return ret;
-
 fail:
 	if (!zpool_can_sleep_mapped(pool))
 		kfree(tmp);
@@ -1121,13 +1094,8 @@ fail:
 	* if we get here due to ZSWAP_SWAPCACHE_EXIST
 	* a load may be happening concurrently.
 	* it is safe and okay to not free the entry.
-	* if we free the entry in the following put
 	* it is also okay to return !0
 	*/
-	spin_lock(&tree->lock);
-	zswap_entry_put(tree, entry);
-	spin_unlock(&tree->lock);
-
 	return ret;
 }
 
