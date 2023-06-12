@@ -191,7 +191,7 @@ struct zswap_pool {
  */
 struct zswap_entry {
 	struct rb_node rbnode;
-	pgoff_t offset;
+	swp_entry_t swpentry;
 	int refcount;
 	unsigned int length;
 	struct zswap_pool *pool;
@@ -200,10 +200,6 @@ struct zswap_entry {
 		unsigned long value;
 	};
 	struct list_head lru;
-};
-
-struct zswap_header {
-	swp_entry_t swpentry;
 };
 
 /*
@@ -247,7 +243,7 @@ static bool zswap_has_pool;
 	pr_debug("%s pool %s/%s\n", msg, (p)->tfm_name,		\
 		 zpool_get_type((p)->zpool))
 
-static int zswap_writeback_entry(struct zswap_entry *entry, struct zswap_header *zhdr,
+static int zswap_writeback_entry(struct zswap_entry *entry,
 				 struct zswap_tree *tree);
 static int zswap_pool_get(struct zswap_pool *pool);
 static void zswap_pool_put(struct zswap_pool *pool);
@@ -308,12 +304,14 @@ static struct zswap_entry *zswap_rb_search(struct rb_root *root, pgoff_t offset)
 {
 	struct rb_node *node = root->rb_node;
 	struct zswap_entry *entry;
+	pgoff_t entry_offset;
 
 	while (node) {
 		entry = rb_entry(node, struct zswap_entry, rbnode);
-		if (entry->offset > offset)
+		entry_offset = swp_offset(entry->swpentry);
+		if (entry_offset > offset)
 			node = node->rb_left;
-		else if (entry->offset < offset)
+		else if (entry_offset < offset)
 			node = node->rb_right;
 		else
 			return entry;
@@ -330,13 +328,15 @@ static int zswap_rb_insert(struct rb_root *root, struct zswap_entry *entry,
 {
 	struct rb_node **link = &root->rb_node, *parent = NULL;
 	struct zswap_entry *myentry;
+	pgoff_t myentry_offset, entry_offset = swp_offset(entry->swpentry);
 
 	while (*link) {
 		parent = *link;
 		myentry = rb_entry(parent, struct zswap_entry, rbnode);
-		if (myentry->offset > entry->offset)
+		myentry_offset = swp_offset(myentry->swpentry);
+		if (myentry_offset > entry_offset)
 			link = &(*link)->rb_left;
-		else if (myentry->offset < entry->offset)
+		else if (myentry_offset < entry_offset)
 			link = &(*link)->rb_right;
 		else {
 			*dupentry = myentry;
@@ -546,7 +546,6 @@ static struct zswap_pool *zswap_pool_find_get(char *type, char *compressor)
 
 static int zswap_reclaim_entry(struct zswap_pool *pool)
 {
-	struct zswap_header *zhdr;
 	struct zswap_entry *entry;
 	struct zswap_tree *tree;
 	pgoff_t swpoffset;
@@ -560,15 +559,13 @@ static int zswap_reclaim_entry(struct zswap_pool *pool)
 	}
 	entry = list_last_entry(&pool->lru, struct zswap_entry, lru);
 	list_del_init(&entry->lru);
-	zhdr = zpool_map_handle(pool->zpool, entry->handle, ZPOOL_MM_RO);
-	tree = zswap_trees[swp_type(zhdr->swpentry)];
-	zpool_unmap_handle(pool->zpool, entry->handle);
 	/*
 	 * Once the lru lock is dropped, the entry might get freed. The
 	 * swpoffset is copied to the stack, and entry isn't deref'd again
 	 * until the entry is verified to still be alive in the tree.
 	 */
-	swpoffset = swp_offset(zhdr->swpentry);
+	swpoffset = swp_offset(entry->swpentry);
+	tree = zswap_trees[swp_type(entry->swpentry)];
 	spin_unlock(&pool->lru_lock);
 
 	/* Check for invalidate() race */
@@ -581,7 +578,7 @@ static int zswap_reclaim_entry(struct zswap_pool *pool)
 	zswap_entry_get(entry);
 	spin_unlock(&tree->lock);
 
-	ret = zswap_writeback_entry(entry, zhdr, tree);
+	ret = zswap_writeback_entry(entry, tree);
 
 	spin_lock(&tree->lock);
 	if (ret) {
@@ -998,10 +995,10 @@ static int zswap_get_swap_cache_page(swp_entry_t entry,
  * the swap cache, the compressed version stored by zswap can be
  * freed.
  */
-static int zswap_writeback_entry(struct zswap_entry *entry, struct zswap_header *zhdr,
+static int zswap_writeback_entry(struct zswap_entry *entry,
 				 struct zswap_tree *tree)
 {
-	swp_entry_t swpentry = zhdr->swpentry;
+	swp_entry_t swpentry = entry->swpentry;
 	struct page *page;
 	struct crypto_comp *tfm;
 	u8 *src, *dst, *tmp = NULL;
@@ -1039,7 +1036,7 @@ static int zswap_writeback_entry(struct zswap_entry *entry, struct zswap_header 
 		 * writing.
 		 */
 		spin_lock(&tree->lock);
-		if (zswap_rb_search(&tree->rbroot, entry->offset) != entry) {
+		if (zswap_rb_search(&tree->rbroot, swp_offset(entry->swpentry)) != entry) {
 			spin_unlock(&tree->lock);
 			delete_from_swap_cache(page);
 			ret = -ENOMEM;
@@ -1050,8 +1047,7 @@ static int zswap_writeback_entry(struct zswap_entry *entry, struct zswap_header 
 		/* decompress */
 		dlen = PAGE_SIZE;
 
-		zhdr = zpool_map_handle(pool, entry->handle, ZPOOL_MM_RO);
-		src = (u8 *)zhdr + sizeof(struct zswap_header);
+		src = zpool_map_handle(pool, entry->handle, ZPOOL_MM_RO);
 		if (!zpool_can_sleep_mapped(pool)) {
 			memcpy(tmp, src, entry->length);
 			src = tmp;
@@ -1141,11 +1137,10 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 	struct crypto_comp *tfm;
 	struct zswap_pool *pool;
 	int ret;
-	unsigned int hlen, dlen = PAGE_SIZE;
+	unsigned int dlen = PAGE_SIZE;
 	unsigned long handle, value;
 	char *buf;
 	u8 *src, *dst;
-	struct zswap_header zhdr = { .swpentry = swp_entry(type, offset) };
 	gfp_t gfp;
 
 	/* THP isn't supported */
@@ -1193,7 +1188,7 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 		src = kmap_atomic(page);
 		if (zswap_is_page_same_filled(src, &value)) {
 			kunmap_atomic(src);
-			entry->offset = offset;
+			entry->swpentry = swp_entry(type, offset);
 			entry->length = 0;
 			entry->value = value;
 			atomic_inc(&zswap_same_filled_pages);
@@ -1227,11 +1222,10 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 	}
 
 	/* store */
-	hlen = sizeof(zhdr);
 	gfp = __GFP_NORETRY | __GFP_NOWARN | __GFP_KSWAPD_RECLAIM;
 	if (zpool_malloc_support_movable(entry->pool->zpool))
 		gfp |= __GFP_HIGHMEM | __GFP_MOVABLE;
-	ret = zpool_malloc(entry->pool->zpool, hlen + dlen, gfp, &handle);
+	ret = zpool_malloc(entry->pool->zpool, dlen, gfp, &handle);
 	if (ret == -ENOSPC) {
 		zswap_reject_compress_poor++;
 		goto put_dstmem;
@@ -1241,13 +1235,12 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 		goto put_dstmem;
 	}
 	buf = zpool_map_handle(entry->pool->zpool, handle, ZPOOL_MM_WO);
-	memcpy(buf, &zhdr, hlen);
-	memcpy(buf + hlen, dst, dlen);
+	memcpy(buf, dst, dlen);
 	zpool_unmap_handle(entry->pool->zpool, handle);
 	put_cpu_var(zswap_dstmem);
 
 	/* populate entry */
-	entry->offset = offset;
+	entry->swpentry = swp_entry(type, offset);
 	entry->handle = handle;
 	entry->length = dlen;
 
@@ -1329,7 +1322,6 @@ static int zswap_frontswap_load(unsigned type, pgoff_t offset,
 	/* decompress */
 	dlen = PAGE_SIZE;
 	src = zpool_map_handle(entry->pool->zpool, entry->handle, ZPOOL_MM_RO);
-	src += sizeof(struct zswap_header);
 
 	if (!zpool_can_sleep_mapped(entry->pool->zpool)) {
 		memcpy(tmp, src, entry->length);
