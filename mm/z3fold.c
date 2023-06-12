@@ -1422,9 +1422,7 @@ static const struct address_space_operations z3fold_aops = {
  * zpool
  ****************/
 
-static void *z3fold_zpool_create(const char *name, gfp_t gfp,
-			       const struct zpool_ops *zpool_ops,
-			       struct zpool *zpool)
+static void *z3fold_zpool_create(const char *name, gfp_t gfp)
 {
 	return z3fold_create_pool(name, gfp);
 }
