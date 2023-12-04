@@ -907,7 +907,7 @@ ifdef CONFIG_THINLTO
 lto-clang-flags	:= -flto=thin
 LDFLAGS		+= --thinlto-cache-dir=.thinlto-cache
 else
-lto-clang-flags	:= -flto
+lto-clang-flags	:= -flto -fwhole-program-vtables
 endif
 lto-clang-flags += -fvisibility=default $(call cc-option, -fsplit-lto-unit)
 
@@ -920,7 +920,7 @@ KBUILD_LDFLAGS_MODULE += $(LD_FLAGS_LTO_CLANG)
 KBUILD_LDFLAGS_MODULE += -T scripts/module-lto.lds
 
 # allow disabling only clang LTO where needed
-DISABLE_LTO_CLANG := -fno-lto
+DISABLE_LTO_CLANG := -fno-lto -fno-whole-program-vtables
 export DISABLE_LTO_CLANG
 endif
 
