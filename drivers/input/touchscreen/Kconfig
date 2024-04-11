@@ -1298,4 +1298,11 @@ config TOUCHSCREEN_RAYDIUM_CHIPSET
 
 source "drivers/input/touchscreen/focaltech_touch/Kconfig"
 
+#ifdef CONFIG_ODM_WT_EDIT
+#Bo.Zhang@ODM_WT.BSP.Touchscreen,2020/03/21,Add Litchi TP for RM begain
+source "drivers/input/touchscreen/ili9881h/Kconfig"
+source "drivers/input/touchscreen/NT36525B/Kconfig"
+#Bo.Zhang@ODM_WT.BSP.Touchscreen,2020/03/21,Add Litchi TP for RM end
+#endif
+
 endif

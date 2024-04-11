@@ -31,6 +31,15 @@
 #define DEFAULT_PANEL_JITTER_ARRAY_SIZE		2
 #define DEFAULT_PANEL_PREFILL_LINES	25
 
+#ifdef CONFIG_VENDOR_EDIT
+//liwei.a@PSW.MM.Display.Stability, 2019/07/12, add interface for tp to get lcd status resumed or not
+int lcd_running_tag = -1;
+
+int get_lcd_status(void){
+	return lcd_running_tag;
+}
+#endif
+
 static struct dsi_display_mode_priv_info default_priv_info = {
 	.panel_jitter_numer = DEFAULT_PANEL_JITTER_NUMERATOR,
 	.panel_jitter_denom = DEFAULT_PANEL_JITTER_DENOMINATOR,
@@ -201,7 +210,12 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 		return;
 	}
 
-	SDE_ATRACE_BEGIN("dsi_display_prepare");
+	#ifdef CONFIG_VENDOR_EDIT
+	//liwei.a@PSW.MM.Display.Stability, 2019/07/12, add interface for tp to get lcd status resumed or not
+	lcd_running_tag = 1;
+	#endif
+
+	SDE_ATRACE_BEGIN("dsi_bridge_pre_enable");
 	rc = dsi_display_prepare(c_bridge->display);
 	if (rc) {
 		pr_err("[%d] DSI display prepare failed, rc=%d\n",
@@ -256,6 +270,10 @@ static void dsi_bridge_enable(struct drm_bridge *bridge)
 			sde_connector_schedule_status_work(display->drm_conn,
 				true);
 	}
+	#ifdef CONFIG_VENDOR_EDIT
+	//liwei.a@PSW.MM.Display.Stability, 2019/07/12, add interface for tp to get lcd status resumed or not
+	lcd_running_tag = 0;
+	#endif
 }
 
 static void dsi_bridge_disable(struct drm_bridge *bridge)
@@ -440,6 +458,12 @@ static bool dsi_bridge_mode_fixup(struct drm_bridge *bridge,
 			(!crtc_state->active_changed ||
 			 display->is_cont_splash_enabled))
 			dsi_mode.dsi_mode_flags |= DSI_MODE_FLAG_DMS;
+
+		#ifdef CONFIG_VENDOR_EDIT
+		/*Mark.Yao@PSW.MM.Display.LCD.Stable,2019-12-09 skip dms switch if cont_splash not ready */
+		if (display->is_cont_splash_enabled)
+			dsi_mode.dsi_mode_flags &= ~DSI_MODE_FLAG_DMS;
+		#endif /* CONFIG_VENDOR_EDIT */
 
 		/* Reject seemless transition when active/connectors changed.*/
 		if ((crtc_state->active_changed ||

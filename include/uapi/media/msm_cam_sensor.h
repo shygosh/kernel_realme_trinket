@@ -296,6 +296,43 @@ struct msm_eeprom_info_t {
 	struct msm_eeprom_memory_map_array *mem_map_array;
 };
 
+
+#ifdef CONFIG_VENDOR_EDIT
+/*add by yufeng@camera, 20190618 for write calibration*/
+#define CALIB_DATA_LENGTH         1561
+#define WRITE_DATA_MAX_LENGTH     8
+#define WRITE_DATA_DELAY          3
+
+struct cam_write_eeprom_t {
+	uint32_t cam_id;
+	uint32_t baseAddr;
+	uint32_t calibDataSize;
+	uint32_t isWRP;
+	uint32_t WRPaddr;
+	uint32_t mdelay;
+	unsigned char calibData[CALIB_DATA_LENGTH];
+};
+
+//add by yufeng@camera, 20190618 for check eeprom data
+#define EEPROM_CHECK_DATA_MAX_SIZE 196
+struct check_eeprom_data_t{
+	uint32_t cam_id;
+	uint32_t startAddr;
+	uint32_t eepromData_checksum;
+} __attribute__ ((packed));
+
+//add by yufeng@camera, 20190618 for write ae sync
+#define AE_SYNC_SIZE 36
+struct cam_write_AE_SYNC_t{
+	uint32_t cam_id;
+	uint32_t baseAddr;
+	uint32_t AESyncSize;
+	uint32_t isWRP;
+	uint32_t WRPaddr;
+	unsigned char AESync[AE_SYNC_SIZE];
+} __attribute__ ((packed));
+#endif
+
 struct msm_ir_led_cfg_data_t {
 	enum msm_ir_led_cfg_type_t cfg_type;
 	int32_t pwm_duty_on_ns;
@@ -635,4 +672,9 @@ struct sensor_init_cfg_data {
 #define VIDIOC_MSM_LASER_LED_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 16, struct msm_laser_led_cfg_data_t)
 
+#ifdef CONFIG_VENDOR_EDIT
+/*add by hongbo.dai@camera, 20190820 for write eeprom data*/
+#define VIDIOC_MSM_EEPROM_WRITE_CALIB \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 17, struct cam_write_eeprom_t)
+#endif
 #endif

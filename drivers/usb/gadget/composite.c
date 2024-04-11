@@ -1814,11 +1814,21 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 					cdev->desc.bcdUSB = cpu_to_le16(0x0320);
 					cdev->desc.bMaxPacketSize0 = 9;
 				} else {
+				#ifdef CONFIG_VENDOR_EDIT
+					/* Hanwenchao@HQ.BSP.Kernel.USB, 20200321, for sometimes can't select usb mode on Windows XP */
+					cdev->desc.bcdUSB = cpu_to_le16(0x0200);
+				#else
 					cdev->desc.bcdUSB = cpu_to_le16(0x0210);
+				#endif
 				}
 			} else {
 				if (gadget->lpm_capable)
+				#ifdef CONFIG_VENDOR_EDIT
+					/* Hanwenchao@HQ.BSP.Kernel.USB, 20200321, for sometimes can't select usb mode on Windows XP */
+					cdev->desc.bcdUSB = cpu_to_le16(0x0200);
+				#else
 					cdev->desc.bcdUSB = cpu_to_le16(0x0201);
+				#endif
 				else
 					cdev->desc.bcdUSB = cpu_to_le16(0x0200);
 			}

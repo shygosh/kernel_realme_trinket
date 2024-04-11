@@ -112,3 +112,11 @@ obj-$(CONFIG_TOUCHSCREEN_RASPBERRYPI_FW)	+= raspberrypi-ts.o
 obj-$(CONFIG_TOUCHSCREEN_IQS5XX)	+= iqs5xx.o
 obj-$(CONFIG_TOUCHSCREEN_ST)	+= st/
 obj-$(CONFIG_TOUCHSCREEN_FTS)	+= focaltech_touch/
+ifeq ($(CONFIG_ODM_WT_EDIT),y)
+obj-$(CONFIG_TOUCHSCREEN_ILI9881H)	 += ili9881h/
+obj-$(CONFIG_INPUT_TOUCHSCREEN)      += headset_notifier.o
+obj-$(CONFIG_INPUT_TOUCHSCREEN)      += usb_notifier.o
+obj-$(CONFIG_INPUT_TOUCHSCREEN)      += update_tpfw_notifier.o
+obj-$(CONFIG_INPUT_TOUCHSCREEN)      += tpd_summer.o
+obj-$(CONFIG_TOUCHSCREEN_NT36525B)	 += NT36525B/
+endif

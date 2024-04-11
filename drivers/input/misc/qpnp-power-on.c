@@ -35,6 +35,20 @@
 #include <linux/qpnp/qpnp-pbs.h>
 #include <linux/qpnp/qpnp-misc.h>
 
+#ifdef CONFIG_VENDOR_EDIT //YiXue.Ge@PSW.BSP.Kernel.Stablity, 2018-10-26 add for enable pmic wd
+#include <linux/kthread.h>
+#include <linux/rtc.h>
+#include <linux/proc_fs.h>
+#include <linux/mutex.h>
+#include <uapi/linux/sched/types.h>
+#include <soc/oppo/oppo_project.h>
+#endif
+
+#ifndef CONFIG_ODM_WT_EDIT
+//xubuchao_wt@ODM_WT.BSP.Boardid,2020/03/19,Add board id for Litchi-Q
+#include <linux/hardware_info.h>
+#endif
+
 #define PMIC_VER_8941				0x01
 #define PMIC_VERSION_REG			0x0105
 #define PMIC_VERSION_REV4_REG			0x0103
@@ -86,8 +100,15 @@
 #define QPNP_PON_KPDPWR_RESIN_S2_CNTL2(pon)	((pon)->base + 0x4B)
 #define QPNP_PON_PS_HOLD_RST_CTL(pon)		((pon)->base + 0x5A)
 #define QPNP_PON_PS_HOLD_RST_CTL2(pon)		((pon)->base + 0x5B)
+#ifdef CONFIG_VENDOR_EDIT //YiXue.Ge@PSW.BSP.Kernel.Stablity, 2018-10-26 add for enable pmic wd
+#define QPNP_PON_WD_RST_S1_TIMER(pon)		((pon)->base + 0x54)
+#define QPNP_PON_WD_RST_S2_TIMER(pon)		((pon)->base + 0x55)
+#endif
 #define QPNP_PON_WD_RST_S2_CTL(pon)		((pon)->base + 0x56)
 #define QPNP_PON_WD_RST_S2_CTL2(pon)		((pon)->base + 0x57)
+#ifdef CONFIG_VENDOR_EDIT //YiXue.Ge@PSW.BSP.Kernel.Stablity, 2018-10-26 add for enable pmic wd
+#define QPNP_PON_WD_RESET_PET(pon)  ((pon)->base + 0x58)
+#endif
 #define QPNP_PON_S3_SRC(pon)			((pon)->base + 0x74)
 #define QPNP_PON_S3_DBC_CTL(pon)		((pon)->base + 0x75)
 #define QPNP_PON_SMPL_CTL(pon)			((pon)->base + 0x7F)
@@ -112,6 +133,11 @@
 #define QPNP_PON_S1_TIMER_MASK			(0xF)
 #define QPNP_PON_S2_TIMER_MASK			(0x7)
 #define QPNP_PON_S2_CNTL_TYPE_MASK		(0xF)
+#ifdef CONFIG_VENDOR_EDIT //YiXue.Ge@PSW.BSP.Kernel.Stablity, 2018-10-26 add for enable pmic wd
+#define QPNP_PON_WD_S2_TIMER_MASK		(0x7F)
+#define QPNP_PON_WD_S1_TIMER_MASK		(0x7F)
+#define QPNP_PON_WD_RESET_PET_MASK		BIT(0)
+#endif
 
 #define QPNP_PON_DBC_DELAY_MASK(pon)	PON_OFFSET((pon)->subtype, 0x7, 0xF)
 
@@ -213,6 +239,11 @@ struct qpnp_pon {
 	struct delayed_work	bark_work;
 	struct dentry		*debugfs;
 	struct device_node	*pbs_dev_node;
+#ifdef CONFIG_VENDOR_EDIT //YiXue.Ge@PSW.BSP.Kernel.Stablity, 2018-10-26 add for enable pmic wd
+	struct task_struct *wd_task;
+	struct mutex		wd_task_mutex;
+	unsigned int		pmicwd_state;//|reserver|rst type|timeout|enable|
+#endif
 	u16			base;
 	u8			subtype;
 	u8			pon_ver;
@@ -841,6 +872,236 @@ int qpnp_pon_wd_config(bool enable)
 }
 EXPORT_SYMBOL(qpnp_pon_wd_config);
 
+#ifdef CONFIG_VENDOR_EDIT //YiXue.Ge@PSW.BSP.Kernel.Stablity, 2018-10-26 add for enable pmic wd
+#define OPPO_PMIC_WD_DEFAULT_TIMEOUT 254
+#define OPPO_PMIC_WD_DEFAULT_ENABLE 1  //wen.luo@BSP.Kernel.Stability, 2019-8-15 add for enable pmic, enable in criticallog_config.xml
+extern int get_eng_version(void);
+int qpnp_get_default_rst_type(void)
+{
+	if(get_eng_version() != AGING)
+		return PON_POWER_OFF_HARD_RESET;
+	else
+		return PON_POWER_OFF_WARM_RESET;
+	return PON_POWER_OFF_HARD_RESET;
+}
+
+int qpnp_pon_wd_timer(unsigned char timer, enum pon_power_off_type reset_type)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	int rc = 0;
+	u8 s1_timer,s2_timer;
+
+	if (!pon)
+		return -EPROBE_DEFER;
+
+	if(timer > 127)
+	{
+		s2_timer = 127;
+		if(timer - 127 > 127)
+			s1_timer = 127;
+		else
+			s1_timer = timer - 127;
+	}else{
+		s2_timer = timer&0xff;
+		s1_timer = 0;
+	}
+	rc = qpnp_pon_masked_write(pon, QPNP_PON_WD_RST_S2_TIMER(pon),
+			QPNP_PON_WD_S2_TIMER_MASK, s2_timer);
+	if (rc)
+		dev_err(pon->dev,
+				"Unable to write to addr=%x, rc(%d)\n",
+				QPNP_PON_WD_RST_S2_TIMER(pon), rc);
+
+	rc = qpnp_pon_masked_write(pon, QPNP_PON_WD_RST_S1_TIMER(pon),
+			QPNP_PON_WD_S1_TIMER_MASK, s1_timer);
+	if (rc)
+		dev_err(pon->dev,
+				"Unable to write to addr=%x, rc(%d)\n",
+				QPNP_PON_WD_RST_S1_TIMER(pon), rc);
+
+	rc = qpnp_pon_masked_write(pon, QPNP_PON_WD_RST_S2_CTL(pon),
+			QPNP_PON_S2_CNTL_TYPE_MASK, reset_type);
+	if (rc)
+		dev_err(pon->dev,
+				"Unable to write to addr=%x, rc(%d)\n",
+				QPNP_PON_WD_RST_S2_CTL(pon), rc);
+
+	return rc;
+}
+EXPORT_SYMBOL(qpnp_pon_wd_timer);
+
+int qpnp_pon_wd_pet(void)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	int rc = 0;
+
+	if (!pon)
+		return -EPROBE_DEFER;
+
+	rc = qpnp_pon_masked_write(pon, QPNP_PON_WD_RESET_PET(pon),
+			QPNP_PON_WD_RESET_PET_MASK, 1);
+	if (rc)
+		dev_err(pon->dev,
+				"Unable to write to addr=%x, rc(%d)\n",
+				QPNP_PON_WD_RESET_PET(pon), rc);
+
+	return rc;
+}
+EXPORT_SYMBOL(qpnp_pon_wd_pet);
+
+static int pmicwd_kthread(void *arg)
+{
+	struct qpnp_pon *pon = (struct qpnp_pon *)arg;
+	struct sched_param param = {.sched_priority = MAX_RT_PRIO-1};
+	sched_setscheduler(current, SCHED_FIFO, &param);
+
+	while (!kthread_should_stop()) {
+		schedule_timeout_interruptible(msecs_to_jiffies((((pon->pmicwd_state >> 8)&0xff)*1000)/2));
+		printk("pmicwd_kthread PET wd \n");
+		qpnp_pon_wd_pet();
+	}
+	qpnp_pon_wd_config(0);
+	return 0;
+}
+static ssize_t pmicwd_proc_read(struct file *file, char __user *buf,
+		size_t count,loff_t *off)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	unsigned int val;
+	char page[128] = {0};
+	int len = 0;
+
+	if(!pon){
+		return -EFAULT;
+	}
+	mutex_lock(&pon->wd_task_mutex);
+	regmap_read(pon->regmap, QPNP_PON_WD_RST_S2_CTL2(pon), &val);
+	printk("pmicwd_proc_read:%x wd=%x\n",pon->pmicwd_state,val);
+	//|reserver|rst type|timeout|enable|
+	len = snprintf(&page[len],128 - len,"enable = %d timeout = %d rstype = %d\n",
+		pon->pmicwd_state & 0xff,(pon->pmicwd_state >> 8) & 0xff,(pon->pmicwd_state >> 16) & 0xff);
+	mutex_unlock(&pon->wd_task_mutex);
+
+	if(len > *off)
+	   len -= *off;
+	else
+	   len = 0;
+
+	if(copy_to_user(buf,page,(len < count ? len : count))){
+	   return -EFAULT;
+	}
+	*off += len < count ? len : count;
+	return (len < count ? len : count);
+
+}
+
+static ssize_t pmicwd_proc_write(struct file *file, const char __user *buf,
+		size_t count,loff_t *off)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	int tmp_rstypt = 0;
+	int tmp_timeout = 0;
+	int tmp_enable = 0;
+	int ret = 0;
+    char buffer[64] = {0};
+	unsigned int new_state;
+
+	if(!pon){
+		return -EFAULT;
+	}
+
+    if (count > 64) {
+       count = 64;
+    }
+
+    if (copy_from_user(buffer, buf, count)) {
+		printk("%s: read proc input error.\n", __func__);
+		return count;
+    }
+	ret = sscanf(buffer, "%d %d %d", &tmp_enable, &tmp_timeout, &tmp_rstypt);
+	if(ret <= 0){
+		printk("%s: input error\n", __func__);
+		return count;
+	}
+	if(tmp_timeout < 60 || tmp_timeout > 255){
+		tmp_timeout = OPPO_PMIC_WD_DEFAULT_TIMEOUT;
+	}
+	if(tmp_rstypt >= PON_POWER_OFF_MAX_TYPE || tmp_rstypt <= PON_POWER_OFF_RESERVED){
+		tmp_rstypt = qpnp_get_default_rst_type();
+	}
+	new_state = (tmp_enable & 0xff)|((tmp_timeout & 0xff) << 8)|((tmp_rstypt & 0xff)<< 16);
+	printk("pmicwd_proc_write:old:%x new:%x\n",pon->pmicwd_state,new_state);
+
+	if(new_state == pon->pmicwd_state)
+		return count;
+
+	mutex_lock(&pon->wd_task_mutex);
+	if(pon->wd_task){
+		qpnp_pon_wd_config(0);
+		pon->pmicwd_state &= ~0xff;
+		kthread_stop(pon->wd_task);
+		pon->wd_task = NULL;
+	}
+	qpnp_pon_wd_timer(tmp_timeout,tmp_rstypt);
+	pon->pmicwd_state = new_state;
+	if(tmp_enable){
+		pon->wd_task = kthread_create(pmicwd_kthread, pon,"pmicwd");
+		if(pon->wd_task){
+			qpnp_pon_wd_config(1);
+			wake_up_process(pon->wd_task);
+		}else{
+			qpnp_pon_wd_config(0);
+			pon->pmicwd_state &= ~0xff;
+		}
+	} 
+	qpnp_pon_wd_pet();
+	mutex_unlock(&pon->wd_task_mutex);
+	return count;
+}
+
+
+#ifdef CONFIG_VENDOR_EDIT /* yanghao@PSW.Kernel.Stability add for debug suspend crash problem */
+void oppo_set_pmicWd_state(int enable)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	unsigned int new_state;
+
+	new_state = (pon->pmicwd_state & ~0x1) | (enable & 0x1);
+
+	printk("oppo_set_pmicWd_state:old:%x new:%x\n", pon->pmicwd_state,new_state);
+	if(new_state == pon->pmicwd_state)
+		return ;
+
+	mutex_lock(&pon->wd_task_mutex);
+	if(pon->wd_task){
+		qpnp_pon_wd_config(0);
+		pon->pmicwd_state &= ~0xff;
+		kthread_stop(pon->wd_task);
+		pon->wd_task = NULL;
+	}
+	pon->pmicwd_state = new_state;
+	if(enable){
+		pon->wd_task = kthread_create(pmicwd_kthread, pon,"pmicwd");
+		if(pon->wd_task){
+			qpnp_pon_wd_config(1);
+			wake_up_process(pon->wd_task);
+		}else{
+			qpnp_pon_wd_config(0);
+			pon->pmicwd_state &= ~0xff;
+		}
+	}
+	qpnp_pon_wd_pet();
+	mutex_unlock(&pon->wd_task_mutex);
+}
+EXPORT_SYMBOL(oppo_set_pmicWd_state);
+#endif
+
+static struct file_operations pmicwd_proc_fops = {
+	.read = pmicwd_proc_read,
+	.write = pmicwd_proc_write,
+};
+#endif
+
 static int qpnp_pon_get_trigger_config(enum pon_trigger_source pon_src,
 							bool *enabled)
 {
@@ -990,9 +1251,14 @@ static int qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	default:
 		return -EINVAL;
 	}
-
+#ifndef CONFIG_ODM_WT_EDIT
+// Lijie.Yang@ODM_WT.BSP.Kernel.Stability.1941873, 2020/03/21, Add for print key code log.
 	pr_debug("PMIC input: code=%d, status=0x%02X\n", cfg->key_code,
 		pon_rt_sts);
+#else
+	pr_err("PMIC input: code=%d, status=0x%02X\n", cfg->key_code,
+		pon_rt_sts);
+#endif
 	key_status = pon_rt_sts & pon_rt_bit;
 
 	if (pon->kpdpwr_dbc_enable && cfg->pon_type == PON_KPDPWR) {
@@ -1008,6 +1274,11 @@ static int qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 		input_report_key(pon->pon_input, cfg->key_code, 1);
 		input_sync(pon->pon_input);
 	}
+
+#ifdef CONFIG_VENDOR_EDIT
+	/* Fanhong.Kong@ProDrv.CHG,add 2016/7/26 for keycode */
+	pr_err("keycode = %d,key_st = %d\n", cfg->key_code, key_status);
+#endif
 
 	input_report_key(pon->pon_input, cfg->key_code, key_status);
 	input_sync(pon->pon_input);
@@ -2145,6 +2416,13 @@ static int qpnp_pon_configure_s3_reset(struct qpnp_pon *pon)
 	return 0;
 }
 
+#ifdef CONFIG_VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+extern char pon_reason[];
+extern char poff_reason[];
+int preason_initialized;
+#endif /*CONFIG_VENDOR_EDIT*/
+
 static int qpnp_pon_read_hardware_info(struct qpnp_pon *pon, bool sys_reset)
 {
 	struct device *dev = pon->dev;
@@ -2190,25 +2468,53 @@ static int qpnp_pon_read_hardware_info(struct qpnp_pon *pon, bool sys_reset)
 
 	/* PON reason */
 	rc = qpnp_pon_read(pon, QPNP_PON_REASON1(pon), &pon_sts);
+#ifndef CONFIG_VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
 	if (rc)
 		return rc;
+#else
+	if (rc) {
+		dev_err(dev,"Unable to read PON_RESASON1 reg rc: %d\n",rc);
+		if (!preason_initialized) {
+			snprintf(pon_reason, 128, "Unable to read PON_RESASON1 reg rc: %d\n", rc);
+			preason_initialized = 1;
+		}
+		return rc;
+	}
+#endif /*CONFIG_VENDOR_EDIT*/
 
 	if (sys_reset)
 		boot_reason = ffs(pon_sts);
 
 	index = ffs(pon_sts) - 1;
+#ifdef CONFIG_VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/18, when KPDPWR_N is set it is PWK start*/
+	if (pon_sts & 0x80)
+		index = 7;
+#endif /*CONFIG_VENDOR_EDIT*/
 	cold_boot = sys_reset_dev ? !_qpnp_pon_is_warm_reset(sys_reset_dev)
 				  : !_qpnp_pon_is_warm_reset(pon);
 	if (index >= ARRAY_SIZE(qpnp_pon_reason) || index < 0) {
 		dev_info(dev, "PMIC@SID%d Power-on reason: Unknown and '%s' boot\n",
 			 to_spmi_device(dev->parent)->usid,
 			 cold_boot ? "cold" : "warm");
+#ifdef CONFIG_VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+		if (!preason_initialized)
+			snprintf(pon_reason, 128, "Unknown[0x%02X] and '%s' boot\n", pon_sts, cold_boot ? "cold" : "warm");
+#endif /*CONFIG_VENDOR_EDIT*/
 	} else {
 		pon->pon_trigger_reason = index;
 		dev_info(dev, "PMIC@SID%d Power-on reason: %s and '%s' boot\n",
 			 to_spmi_device(dev->parent)->usid,
 			 qpnp_pon_reason[index],
 			 cold_boot ? "cold" : "warm");
+#ifdef CONFIG_VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+		if (!preason_initialized)
+			snprintf(pon_reason, 128, "[0x%02X]%s and '%s' boot\n", pon_sts,
+				qpnp_pon_reason[index],	cold_boot ? "cold" : "warm");
+#endif /*CONFIG_VENDOR_EDIT*/
 	}
 
 	/* POFF reason */
@@ -2223,6 +2529,13 @@ static int qpnp_pon_read_hardware_info(struct qpnp_pon *pon, bool sys_reset)
 		if (rc) {
 			dev_err(dev, "Register read failed, addr=0x%04X, rc=%d\n",
 				QPNP_POFF_REASON1(pon), rc);
+#ifdef CONFIG_VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+			if (!preason_initialized) {
+				snprintf(poff_reason, 128, "Unable to read POFF_RESASON regs rc:%d\n", rc);
+				preason_initialized = 1;
+			}
+#endif /*CONFIG_VENDOR_EDIT*/
 			return rc;
 		}
 		poff_sts = buf[0] | (buf[1] << 8);
@@ -2231,11 +2544,25 @@ static int qpnp_pon_read_hardware_info(struct qpnp_pon *pon, bool sys_reset)
 	if (index >= ARRAY_SIZE(qpnp_poff_reason) || index < 0) {
 		dev_info(dev, "PMIC@SID%d: Unknown power-off reason\n",
 			 to_spmi_device(dev->parent)->usid);
+#ifdef CONFIG_VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+		if (!preason_initialized) {
+			snprintf(poff_reason, 128, "Unknown[0x%04X]\n", poff_sts);
+			preason_initialized = 1;
+		}
+#endif /*CONFIG_VENDOR_EDIT*/
 	} else {
 		pon->pon_power_off_reason = index;
 		dev_info(dev, "PMIC@SID%d: Power-off reason: %s\n",
 			 to_spmi_device(dev->parent)->usid,
 			 qpnp_poff_reason[index]);
+#ifdef CONFIG_VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+		if (!preason_initialized) {
+			snprintf(poff_reason, 128, "[0x%04X]%s\n", poff_sts, qpnp_poff_reason[index]);
+			preason_initialized = 1;
+		}
+#endif /*CONFIG_VENDOR_EDIT*/
 	}
 
 	if ((pon->pon_trigger_reason == PON_SMPL ||
@@ -2323,6 +2650,92 @@ static int qpnp_pon_parse_dt_power_off_config(struct qpnp_pon *pon)
 	return 0;
 }
 
+#ifndef CONFIG_ODM_WT_EDIT
+//xubuchao1_wt@ODM_WT.BSP.Boardid,2020/03/19,Add board id for Litchi-Q
+extern char board_id[HARDWARE_MAX_ITEM_LONGTH];
+void probe_board_and_set(void)
+{
+	char* boadrid_start;
+	char boardid_info[HARDWARE_MAX_ITEM_LONGTH];
+
+	boadrid_start = strstr(saved_command_line,"board_id=");
+	memset(boardid_info, 0, HARDWARE_MAX_ITEM_LONGTH);
+	if(boadrid_start != NULL)
+	{
+		strncpy(boardid_info, boadrid_start+sizeof("board_id=")-1, 9);//skip the header "board_id="
+	}
+	else
+	{
+		sprintf(boardid_info, "boarid not define!");
+	}
+	strlcpy(board_id, boardid_info, HARDWARE_MAX_ITEM_LONGTH);
+}
+
+void oppoversion_info_set(char *name, char *version);
+static int __init modem_id_set(char *str)
+{
+	oppoversion_info_set("modemType", str);
+	switch (*str){
+		case '1':
+			oppoversion_info_set("operatorName", "Asia");
+			break;
+		case '2':
+			oppoversion_info_set("operatorName", "Global");
+			break;
+		case '3':
+			oppoversion_info_set("operatorName", "Global_NFC");
+			break;
+		case '4':
+			oppoversion_info_set("operatorName", "CN");
+			break;
+		case '5':
+			oppoversion_info_set("operatorName", "Vietnam_4G");
+			break;
+		case '6':
+			oppoversion_info_set("operatorName", "Vietnam_3G");
+			break;
+		default:
+			oppoversion_info_set("operatorName", "unknow");
+	}
+	return 1;
+}
+static int __init hwversion_set(char *str)
+{
+	oppoversion_info_set("pcbVersion", str);
+	return 1;
+}
+
+static int __init board_id_set(char *str)
+{
+	if((strncmp(str,"S86125AA1",strlen("S86125AA1")) == 0) ||
+		(strncmp(str,"S86125BA1",strlen("S86125BA1")) == 0)||
+		(strncmp(str,"S86125CA1",strlen("S86125CA1")) == 0)||
+		(strncmp(str,"S86125DA1",strlen("S86125DA1")) == 0)||
+		(strncmp(str,"S86125EA1",strlen("S86125EA1")) == 0)||
+		(strncmp(str,"S86125FA1",strlen("S86125FA1")) == 0)||
+		(strncmp(str,"S86125GA1",strlen("S86125GA1")) == 0)||
+		(strncmp(str,"S86125JA1",strlen("S86125JA1")) == 0)||
+		(strncmp(str,"S86125HA1",strlen("S86125HA1")) == 0)||
+		(strncmp(str,"S86125YA1",strlen("S86125YA1")) == 0)||
+		(strncmp(str,"S86125ZA1",strlen("S86125ZA1")) == 0))
+		oppoversion_info_set("prjVersion", "19361");
+	else if((strncmp(str,"S86125PB1",strlen("S86125PB1")) == 0)||
+			(strncmp(str,"S86125QB1",strlen("S86125QB1")) == 0)||
+			(strncmp(str,"S86125RB1",strlen("S86125RB1")) == 0)||
+			(strncmp(str,"S86125TB1",strlen("S86125TB1")) == 0)||
+			(strncmp(str,"S86125UB1",strlen("S86125UB1")) == 0)||
+			(strncmp(str,"S86125VB1",strlen("S86125VB1")) == 0)||
+			(strncmp(str,"S86125WB1",strlen("S86125WB1")) == 0))
+			oppoversion_info_set("prjVersion", "19637");
+		else
+			oppoversion_info_set("prjVersion", "00000");//knowstatus
+	return 1;
+}
+__setup("modemId=", modem_id_set);
+__setup("androidboot.hwversion=", hwversion_set);
+__setup("board_id=", board_id_set);
+#endif
+
 static int qpnp_pon_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -2332,6 +2745,10 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 	u32 base, delay;
 	bool sys_reset;
 	int rc;
+#ifdef CONFIG_VENDOR_EDIT
+/*xing.xiong@BSP.Kernel.Driver, 2019/07/31, Add for get pwr status when power on*/
+	u32 pon_rt_sts = 0;
+#endif
 
 	pon = devm_kzalloc(dev, sizeof(*pon), GFP_KERNEL);
 	if (!pon)
@@ -2460,7 +2877,37 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 	if (sys_reset)
 		sys_reset_dev = pon;
 
+	#ifdef CONFIG_VENDOR_EDIT //YiXue.Ge@PSW.BSP.Kernel.Stablity, 2018-10-26 add for enable pmic wd
+	pon->pmicwd_state = of_property_read_bool(pdev->dev.of_node,"oppo,pmicwd");
+	pon->wd_task = NULL;
+	if(sys_reset && pon->pmicwd_state){
+		pon->pmicwd_state = OPPO_PMIC_WD_DEFAULT_ENABLE | (OPPO_PMIC_WD_DEFAULT_TIMEOUT << 8) |
+				((qpnp_get_default_rst_type()) << 16);
+		proc_create("pmicWd", S_IRWXUGO, NULL, &pmicwd_proc_fops);
+		mutex_init(&pon->wd_task_mutex);
+		#if OPPO_PMIC_WD_DEFAULT_ENABLE
+		pon->wd_task = kthread_create(pmicwd_kthread, pon,"pmicwd");
+		if(pon->wd_task){
+			qpnp_pon_wd_timer(OPPO_PMIC_WD_DEFAULT_TIMEOUT,qpnp_get_default_rst_type());
+			qpnp_pon_wd_config(1);
+			wake_up_process(pon->wd_task);
+		}else{
+			pon->pmicwd_state &= ~0xff;
+		}
+		#endif
+	}
+
+	/*xing.xiong@BSP.Kernel.Driver, 2019/07/31, Add for get pwr status when power on*/
+	regmap_read(pon->regmap, QPNP_PON_RT_STS(pon), &pon_rt_sts);
+	dev_info(dev, "probe keycode = 116, key_st = 0x%x\n", pon_rt_sts);
+	#endif
+
 	qpnp_pon_debugfs_init(pon);
+
+    #ifndef CONFIG_ODM_WT_EDIT
+    //xubuchao1_wt@ODM_WT.BSP.Boardid,2020/03/19,Add board id for Litchi-Q
+    probe_board_and_set();
+    #endif
 
 	return 0;
 }
@@ -2484,6 +2931,127 @@ static int qpnp_pon_remove(struct platform_device *pdev)
 
 	return 0;
 }
+
+#ifdef CONFIG_VENDOR_EDIT //YiXue.Ge@PSW.BSP.Kernel.Stablity, 2018-10-26 add for enable pmic wd
+static int  setalarm(unsigned long time,bool enable)
+{
+	static struct rtc_device *rtc;
+	static struct rtc_wkalrm alm;
+	static struct rtc_wkalrm org_alm;
+	unsigned long now;
+	int rc = -1;
+	static bool store_alm_success = false;
+
+	if(!rtc){
+		rtc = rtc_class_open("rtc0");
+	}
+
+	if(!rtc){
+		printk("open rtc fail %d\n",rc);
+		return rc;
+	}
+
+	if(enable){
+		rc = rtc_read_alarm(rtc, &org_alm);
+		if (rc < 0) {
+			printk("setalarm read alarm fail %d\n",rc);
+			store_alm_success = false;
+			return rc;
+		}
+		store_alm_success = true;
+		rc = rtc_read_time(rtc, &alm.time);
+		if (rc < 0) {
+			printk("setalarm read time fail %d\n",rc);
+			return rc;
+		}
+
+		rtc_tm_to_time(&alm.time, &now);
+		memset(&alm, 0, sizeof alm);
+		rtc_time_to_tm(now + time, &alm.time);
+		alm.enabled = true;
+		rc = rtc_set_alarm(rtc, &alm);
+		if (rc < 0) {
+			printk("setalarm  set alarm fail %d\n",rc);
+			return rc;
+		}
+	} else if (store_alm_success) {
+		alm.enabled = false;
+		rc = rtc_set_alarm(rtc, &alm);
+		if (rc < 0) {
+			printk("setalarm  set alarm fail %d\n",rc);
+			return rc;
+		}
+	    /* consider setting timer and orginal timer. we store orginal timer at pon suspend,
+           and reset rtc from store at pon resume, no matter which one is greater. bottom
+           driver would judge write to RTC or not. */
+		rc = rtc_set_alarm(rtc, &org_alm);
+		if (rc < 0) {
+			printk("setalarm  set org alarm fail %d\n",rc);
+			return rc;
+		}
+	} else {
+		printk("%s store_alm_success:%d\n", __func__, store_alm_success);
+	}
+	return 0;
+}
+static int qpnp_suspend(struct device *dev)
+{
+	struct qpnp_pon *pon =
+			(struct qpnp_pon *)dev_get_drvdata(dev);
+	unsigned long time = 0;
+
+	if(sys_reset_dev == NULL || sys_reset_dev != pon){
+		return 0;
+	}
+	if(!(pon->pmicwd_state & 0xff))
+	{
+		printk("%s:qpnp_suspend disable wd\n",dev_name(dev));
+		return 0;
+	}
+	time = (pon->pmicwd_state >> 8)&0xff;
+	printk("%s:qpnp_suspend wd has enable\n",dev_name(dev));
+	qpnp_pon_wd_pet();
+	setalarm(time - 30,true);
+	return 0;
+}
+
+static int qpnp_resume(struct device *dev)
+{
+	struct qpnp_pon *pon =
+			(struct qpnp_pon *)dev_get_drvdata(dev);
+
+
+	if(sys_reset_dev == NULL || sys_reset_dev != pon
+		|| !(pon->pmicwd_state & 0xff)){
+		return 0;
+	}
+	printk("%s:qpnp_resume wd has enable\n",dev_name(dev));
+	//disable alarm
+	setalarm(0,false);
+	qpnp_pon_wd_pet();
+	return 0;
+}
+
+static int qpnp_poweroff(struct device *dev)
+{
+	struct qpnp_pon *pon =
+			(struct qpnp_pon *)dev_get_drvdata(dev);
+	printk("qpnp_poweroff is call\n");
+	if(sys_reset_dev == NULL || sys_reset_dev != pon)
+		return 0;
+	qpnp_pon_wd_pet();
+	qpnp_pon_wd_config(0);
+	return 0;
+}
+
+#if 0
+static const struct dev_pm_ops qpnp_pm_ops = {
+	.suspend = qpnp_suspend,
+	.resume = qpnp_resume,
+	.poweroff = qpnp_poweroff,
+};
+#endif
+#endif /* CONFIG_VENDOR_EDIT */
 
 #ifdef CONFIG_PM
 static int qpnp_pon_restore(struct device *dev)
@@ -2532,6 +3100,11 @@ static const struct dev_pm_ops qpnp_pon_pm_ops = {
 	.freeze = qpnp_pon_freeze,
 	.restore = qpnp_pon_restore,
 	.thaw = qpnp_pon_restore,
+#ifdef CONFIG_VENDOR_EDIT //YiXue.Ge@PSW.BSP.Kernel.Stablity, 2018-10-26 add for enable pmic wd	
+	.suspend = qpnp_suspend,
+	.resume = qpnp_resume,
+	.poweroff = qpnp_poweroff,	
+#endif	
 };
 #endif
 

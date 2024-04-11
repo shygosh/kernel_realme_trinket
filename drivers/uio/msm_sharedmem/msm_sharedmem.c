@@ -25,6 +25,12 @@
 #define CLIENT_ID_PROP "qcom,client-id"
 #define MPSS_RMTS_CLIENT_ID 1
 
+//#ifdef CONFIG_VENDOR_EDIT
+//Zhengpeng.Tan@NW.MDM.NV.892767, 2016/11/30
+//add for nv backup and restore
+#define MPSS_OEMBACK_CLIENT_ID 4
+//#endif /* CONFIG_VENDOR_EDIT */
+
 static int uio_get_mem_index(struct uio_info *info, struct vm_area_struct *vma)
 {
 	if (vma->vm_pgoff >= MAX_UIO_MAPS)
@@ -81,8 +87,13 @@ static void setup_shared_ram_perms(u32 client_id, phys_addr_t addr, u32 size,
 	int ret;
 	u32 source_vmlist[1] = {VMID_HLOS};
 
-	if (client_id != MPSS_RMTS_CLIENT_ID)
+	//#ifndef CONFIG_VENDOR_EDIT
+	//Zhengpeng.Tan@NW.MDM.NV.892767, 2016/11/30
+	//add for nv backup and restore
+	//if (client_id != MPSS_RMTS_CLIENT_ID)
+	if ((client_id != MPSS_RMTS_CLIENT_ID) && (client_id != MPSS_OEMBACK_CLIENT_ID))
 		return;
+	//#endif /* CONFIG_VENDOR_EDIT */
 
 	if (vm_nav_path) {
 		int dest_vmids[3] = {VMID_HLOS, VMID_MSS_MSA, VMID_NAV};
