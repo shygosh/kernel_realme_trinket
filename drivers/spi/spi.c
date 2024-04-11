@@ -3581,7 +3581,12 @@ static int __init spi_init(void)
 {
 	int	status;
 
+#ifndef CONFIG_VENDOR_EDIT
 	buf = kmalloc(SPI_BUFSIZ, GFP_KERNEL);
+#else
+	//#Lijie.Yang@ODM_WT.BSP.Kernel.Stability.1941873, 2020/06/08, modify for spi buf alloc flag
+	buf = kmalloc(SPI_BUFSIZ, GFP_KERNEL | GFP_DMA);
+#endif
 	if (!buf) {
 		status = -ENOMEM;
 		goto err0;

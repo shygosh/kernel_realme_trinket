@@ -111,19 +111,19 @@
 
 #define HSTX_TRIMSIZE			4
 
-static unsigned int tune1;
+static unsigned int tune1 = 0xc8;
 module_param(tune1, uint, 0644);
 MODULE_PARM_DESC(tune1, "QUSB PHY TUNE1");
 
-static unsigned int tune2;
+static unsigned int tune2 = 0x30;
 module_param(tune2, uint, 0644);
 MODULE_PARM_DESC(tune2, "QUSB PHY TUNE2");
 
-static unsigned int tune3;
+static unsigned int tune3 = 0x83;
 module_param(tune3, uint, 0644);
 MODULE_PARM_DESC(tune3, "QUSB PHY TUNE3");
 
-static unsigned int tune4;
+static unsigned int tune4 = 0xc7;
 module_param(tune4, uint, 0644);
 MODULE_PARM_DESC(tune4, "QUSB PHY TUNE4");
 

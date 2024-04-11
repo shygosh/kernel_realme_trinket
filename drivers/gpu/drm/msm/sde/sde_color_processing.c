@@ -643,6 +643,7 @@ static void sde_cp_crtc_setfeature(struct sde_cp_node *prop_node,
 	struct sde_ad_hw_cfg ad_cfg;
 
 	sde_cp_get_hw_payload(prop_node, &hw_cfg, &feature_enabled);
+
 	hw_cfg.num_of_mixers = sde_crtc->num_mixers;
 	hw_cfg.last_feature = 0;
 

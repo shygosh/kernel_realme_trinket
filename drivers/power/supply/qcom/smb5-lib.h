@@ -89,6 +89,10 @@ enum print_reason {
 #define DCIN_AICL_VOTER			"DCIN_AICL_VOTER"
 #define OVERHEAT_LIMIT_VOTER		"OVERHEAT_LIMIT_VOTER"
 #define GPIO_DCIN_VOTER			"GPIO_DCIN_VOTER"
+#ifdef CONFIG_VENDOR_EDIT
+// Kun.Zhang@BSP.CHG.Basic, 2019/04/09  add for charge
+#define DEFAULT_100MA_VOTER		"DEFAULT_100MA_VOTER"
+#endif
 
 #define BOOST_BACK_STORM_COUNT	3
 #define WEAK_CHG_STORM_COUNT	8
@@ -102,7 +106,14 @@ enum print_reason {
 #define SDP_100_MA			100000
 #define SDP_CURRENT_UA			500000
 #define CDP_CURRENT_UA			1500000
-#define DCP_CURRENT_UA			1500000
+#ifndef CONFIG_VENDOR_EDIT
+// wenbin.liu@BSP.CHG.Basic, 2017/11/27 
+// Delete for oppo dcp 2A 
+#define DCP_CURRENT_UA                  1500000
+#else
+#define DCP_CURRENT_UA                  2000000
+#endif
+
 #define HVDCP_CURRENT_UA		3000000
 #define TYPEC_DEFAULT_CURRENT_UA	900000
 #define TYPEC_MEDIUM_CURRENT_UA		1500000
@@ -376,6 +387,10 @@ struct smb_iio {
 	struct iio_channel	*connector_temp_chan;
 	struct iio_channel	*sbux_chan;
 	struct iio_channel	*vph_v_chan;
+#ifdef CONFIG_VENDOR_EDIT
+    /* tongfeng.Huang@BSP.CHG.Basic, 2018/11/02,  Add for charging chargerid adc*/
+        struct iio_channel  *chgid_v_chan;
+#endif
 	struct iio_channel	*die_temp_chan;
 	struct iio_channel	*skin_temp_chan;
 	struct iio_channel	*smb_temp_chan;
@@ -412,6 +427,10 @@ struct smb_charger {
 	struct power_supply		*dc_psy;
 	struct power_supply		*bms_psy;
 	struct power_supply		*usb_main_psy;
+#ifdef CONFIG_VENDOR_EDIT
+/* Jianchao.Shi@BSP.CHG.Basic, 2017/03/07, sjc Add for charging*/
+	struct power_supply		*ac_psy;
+#endif
 	struct power_supply		*usb_port_psy;
 	struct power_supply		*wls_psy;
 	struct power_supply		*cp_psy;
@@ -465,6 +484,10 @@ struct smb_charger {
 	struct delayed_work	pl_enable_work;
 	struct delayed_work	uusb_otg_work;
 	struct delayed_work	bb_removal_work;
+#ifdef CONFIG_VENDOR_EDIT
+/* Jianchao.Shi@BSP.CHG.Basic, 2017/03/25, sjc Add for charging */
+        struct delayed_work     chg_monitor_work;
+#endif
 	struct delayed_work	lpd_ra_open_work;
 	struct delayed_work	lpd_detach_work;
 	struct delayed_work	thermal_regulation_work;
@@ -623,7 +646,82 @@ struct smb_charger {
 	int			micro_usb_pre_state;
 	bool			dcin_uusb_over_gpio_en;
 	bool			aicl_disable;
+	/* wireless */
+	int			wireless_vout;
+#ifdef CONFIG_VENDOR_EDIT
+    /* Jianchao.Shi@BSP.CHG.Basic, 2017/08/10, sjc Add for charging */
+	int			pre_current_ma;
+	bool		is_dpdm_on_usb;
+	struct delayed_work		divider_set_work;
+	struct work_struct		dpdm_set_work;
+#endif
+
+#ifdef CONFIG_VENDOR_EDIT
+	/* tongfeng.Huang@BSP.CHG.Basic, 2018/09/27, sjc Add for set uart pinctrl to read chargerID */   
+	int			shipmode_id_gpio;
+	struct pinctrl			*shipmode_id_pinctrl;
+	struct pinctrl_state	*shipmode_id_active;
+#endif
 };
+
+#ifdef CONFIG_VENDOR_EDIT
+/* Yichun Chen@BSP.CHG.Basic, 2018/04/25, Add for OPPO_CHARGE */
+enum skip_reason {
+	REASON_OTG_ENABLED	= BIT(0),
+	REASON_FLASH_ENABLED	= BIT(1)
+};
+
+struct smb_dt_props {
+	int			usb_icl_ua;
+	struct device_node	*revid_dev_node;
+	enum float_options	float_option;
+	int			chg_inhibit_thr_mv;
+	bool			no_battery;
+	bool			hvdcp_disable;
+	bool			hvdcp_autonomous;
+	int			sec_charger_config;
+	int			auto_recharge_soc;
+	int			auto_recharge_vbat_mv;
+	int			wd_bark_time;
+	int			wd_snarl_time_cfg;
+	int			batt_profile_fcc_ua;
+	int			batt_profile_fv_uv;
+	int			term_current_src;
+	int			term_current_thresh_hi_ma;
+	int			term_current_thresh_lo_ma;
+	int			disable_suspend_on_collapse;
+};
+
+struct smb5 {
+	struct smb_charger	chg;
+	struct dentry		*dfs_root;
+	struct smb_dt_props	dt;
+};
+
+
+struct qcom_pmic {
+	struct smb5 *smb5_chip;
+	struct qpnp_vadc_chip	*pmi632_vadc_dev;
+	struct qpnp_vadc_chip	*pm8953_vadc_dev;
+
+	/* for complie*/
+	bool			otg_pulse_skip_dis;
+	int			pulse_cnt;
+	unsigned int	therm_lvl_sel;
+	bool			psy_registered;
+	int			usb_online;
+	
+	/* copy from msm8976_pmic begin */
+	int			bat_charging_state;
+	bool	 		suspending;
+	bool			aicl_suspend;
+	bool			usb_hc_mode;
+	int    		usb_hc_count;
+	bool			hc_mode_flag;
+	/* copy form msm8976_pmic end */
+};
+#endif /*CONFIG_VENDOR_EDIT*/
+
 
 int smblib_read(struct smb_charger *chg, u16 addr, u8 *val);
 int smblib_masked_write(struct smb_charger *chg, u16 addr, u8 mask, u8 val);
@@ -638,6 +736,15 @@ int smblib_get_aicl_cont_threshold(struct smb_chg_param *param, u8 val_raw);
 int smblib_enable_charging(struct smb_charger *chg, bool enable);
 int smblib_set_charge_param(struct smb_charger *chg,
 			    struct smb_chg_param *param, int val_u);
+#ifdef CONFIG_VENDOR_EDIT  /*zhangkun add for qpnp-smb5.c oppo*/
+int smblib_set_opt_switcher_freq(struct smb_charger *chg, int fsw_khz);
+int smblib_set_charge_param(struct smb_charger *chg,
+			    struct smb_chg_param *param, int val_u);
+irqreturn_t usbid_change_handler(int irq, void *data);
+const struct apsd_result *smblib_update_usb_type(struct smb_charger *chg);
+//bool oppo_usbid_check_is_gpio(struct oppo_chg_chip *chip);
+#endif      /*zhangkun add for qpnp-smb5.c oppo*/
+
 int smblib_set_usb_suspend(struct smb_charger *chg, bool suspend);
 int smblib_set_dc_suspend(struct smb_charger *chg, bool suspend);
 

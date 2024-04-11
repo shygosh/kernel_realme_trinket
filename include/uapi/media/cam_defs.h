@@ -86,6 +86,11 @@ struct cam_control {
 #define VIDIOC_CAM_CONTROL \
 	_IOWR('V', BASE_VIDIOC_PRIVATE, struct cam_control)
 
+#ifdef CONFIG_VENDOR_EDIT
+/*add by hongbo.dai@Camera,20180326 for AT test*/
+#define VIDIOC_CAM_FTM_POWNER_UP 0
+#define VIDIOC_CAM_FTM_POWNER_DOWN 1
+#endif
 /**
  * struct cam_hw_version - Structure for HW version of camera devices
  *

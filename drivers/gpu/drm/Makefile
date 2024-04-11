@@ -3,6 +3,13 @@
 # Makefile for the drm device driver.  This driver provides support for the
 # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
 
+#ifdef CONFIG_ODM_WT_EDIT
+#Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/09, add CABC cmd used for power saving
+ccflags-y += -Idrivers/gpu/drm/msm/sde
+ccflags-y += -Idrivers/gpu/drm/msm
+#Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add CABC cmd used for power saving
+#endif /* CONFIG_ODM_WT_EDIT */
+
 drm-y       :=	drm_auth.o drm_bufs.o drm_cache.o \
 		drm_context.o drm_dma.o \
 		drm_file.o drm_gem.o drm_ioctl.o drm_irq.o \

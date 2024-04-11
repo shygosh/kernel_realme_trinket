@@ -317,6 +317,7 @@ struct qpnp_flash_led {
 	struct power_supply		*bms_psy;
 	struct power_supply		*main_psy;
 	struct power_supply		*usb_psy;
+	struct power_supply		*batt_psy;
 	struct notifier_block		nb;
 	spinlock_t			lock;
 	int				num_fnodes;
@@ -1484,9 +1485,18 @@ static int qpnp_flash_led_switch_set(struct flash_switch_data *snode, bool on)
 {
 	struct qpnp_flash_led *led = dev_get_drvdata(&snode->pdev->dev);
 	u8 pmic_subtype = led->pdata->pmic_rev_id->pmic_subtype;
-	int rc, i, addr_offset;
+	int rc, i, addr_offset, flag;
 	u8 val, mask;
-
+	union power_supply_propval ret = {0, };
+#ifdef CONFIG_VENDOR_EDIT
+/* SHUBHAM KABRA PSW.Camera.Drv  2020-1-19  for Fixed a problem with unstable torch current */
+	if (!led->batt_psy) {
+		led->batt_psy = power_supply_get_by_name("battery");//get the battery power supply
+		if (!led->batt_psy) {
+			pr_err_ratelimited("Couldn't get batt_psy\n");
+		}
+	}
+#endif
 	if (snode->enabled == on) {
 		pr_debug("Switch node is already %s!\n",
 			on ? "enabled" : "disabled");
@@ -1495,6 +1505,16 @@ static int qpnp_flash_led_switch_set(struct flash_switch_data *snode, bool on)
 
 	if (!on) {
 		rc = qpnp_flash_led_switch_disable(snode);
+#ifdef CONFIG_VENDOR_EDIT
+/* SHUBHAM KABRA PSW.Camera.Drv  2020-1-19  for Fixed a problem with unstable torch current */
+		ret.intval = 0;
+		flag = power_supply_set_property(led->batt_psy,
+				POWER_SUPPLY_PROP_TORCH_CURRENT_WA, &ret);
+		if(flag < 0)
+			pr_err("shubham: Unable to write original data to 0x1150");
+		else
+			pr_err("shubham: written original data 0xf to 0x1150");
+#endif
 		return rc;
 	}
 
@@ -1507,6 +1527,16 @@ static int qpnp_flash_led_switch_set(struct flash_switch_data *snode, bool on)
 			return rc;
 		}
 	}
+#ifdef CONFIG_VENDOR_EDIT
+/* SHUBHAM KABRA PSW.Camera.Drv  2020-1-19  for Fixed a problem with unstable torch current */
+	ret.intval = 1;
+	flag = power_supply_set_property(led->batt_psy,
+		    POWER_SUPPLY_PROP_TORCH_CURRENT_WA, &ret);
+	if(flag < 0)
+		pr_err("shubham: unable to read or write data at 0x1150");
+	else
+		pr_err("shubham: successfully read & write data at 0x1150");
+#endif
 
 	val = 0;
 	for (i = 0; i < led->num_fnodes; i++)

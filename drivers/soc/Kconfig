@@ -18,4 +18,9 @@ source "drivers/soc/ux500/Kconfig"
 source "drivers/soc/versatile/Kconfig"
 source "drivers/soc/zte/Kconfig"
 
+# ifdef CONFIG_VENDOR_EDIT
+# yinchao@BSP.kernel.drvier, 2019/10/19, add for oppo project;
+source "drivers/soc/oppo/Kconfig"
+# endif
+
 endmenu

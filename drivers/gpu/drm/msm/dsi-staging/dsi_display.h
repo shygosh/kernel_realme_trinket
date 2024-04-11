@@ -28,6 +28,12 @@
 #include "dsi_ctrl.h"
 #include "dsi_phy.h"
 #include "dsi_panel.h"
+#ifdef CONFIG_VENDOR_EDIT
+/* Gou shengjun@PSW.MM.Display.LCD.Stability,2018/11/21
+ * Add for save select panel and give different feature
+*/
+#include <linux/dsi_oppo_support.h>
+#endif /*CONFIG_VENDOR_EDIT*/
 
 #define DSI_CLIENT_NAME_SIZE		20
 #define MAX_CMDLINE_PARAM_LEN	 512
@@ -614,6 +620,16 @@ void dsi_display_enable_event(struct drm_connector *connector,
 int dsi_display_set_backlight(struct drm_connector *connector,
 		void *display, u32 bl_lvl);
 
+//#ifdef CONFIG_ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/9, add CABC cmd used for power saving
+int dsi_display_set_cabc_mode(struct drm_connector *connector,
+		void *display, u32 cabc_mode);
+
+int dsi_display_get_cabc_mode(struct drm_connector *connector,
+		void *display, unsigned int *cabc_mode);
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/9, add CABC cmd used for power saving
+//#endif /* CONFIG_ODM_WT_EDIT */
+
 /**
  * dsi_display_check_status() - check if panel is dead or alive
  * @connector:          Pointer to drm connector structure
@@ -702,6 +718,17 @@ enum dsi_pixel_format dsi_display_get_dst_format(
  * Return: Zero on Success
  */
 int dsi_display_cont_splash_config(void *display);
+#ifdef CONFIG_VENDOR_EDIT
+/* Gou shengjun@PSW.MM.Display.LCD.Stability,2018/10/21
+ * Add for support aod,hbm,seed
+*/
+struct dsi_display *get_main_display(void);
+
+/* Add for implement panel register read */
+int dsi_host_alloc_cmd_tx_buffer(struct dsi_display *display);
+int dsi_display_cmd_engine_enable(struct dsi_display *display);
+int dsi_display_cmd_engine_disable(struct dsi_display *display);
+#endif
 /*
  * dsi_display_get_panel_vfp - get panel vsync
  * @display: Pointer to private display structure

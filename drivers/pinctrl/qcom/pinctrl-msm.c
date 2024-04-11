@@ -622,10 +622,31 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
 	unsigned gpio = chip->base;
 	unsigned i;
 
+        #ifndef CONFIG_ODM_WT_EDIT
 	for (i = 0; i < chip->ngpio; i++, gpio++) {
 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
 		seq_puts(s, "\n");
 	}
+        #else
+        //xubuchao1_wt@ODM_WT.BSP, 2020/04/22, skip gpio as below
+	for (i = 0; i < chip->ngpio; i++, gpio++) {
+	    switch (gpio)
+            {
+                case 0:
+                case 1:
+                case 2:
+                case 3:
+                case 30:
+                case 31:
+                case 32:
+                case 33:
+                    continue;
+                default:
+                    msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
+                    seq_puts(s, "\n");
+                }
+        }
+        #endif
 }
 
 #else

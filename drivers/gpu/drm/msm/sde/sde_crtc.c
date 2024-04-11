@@ -42,6 +42,17 @@
 #include "sde_power_handle.h"
 #include "sde_core_perf.h"
 #include "sde_trace.h"
+#ifdef CONFIG_VENDOR_EDIT
+/* Gou shengjun@PSW.MM.Display.Lcd.Stability, 2018-11-21
+ * Add for drm notifier for display connect
+*/
+#include <linux/msm_drm_notify.h>
+#include <linux/notifier.h>
+
+
+int oppo_underbrightness_alpha = 0;
+extern int msm_drm_notifier_call_chain(unsigned long val, void *v);
+#endif
 
 #define SDE_PSTATES_MAX (SDE_STAGE_MAX * 4)
 #define SDE_MULTIRECT_PLANE_MAX (SDE_STAGE_MAX * 2)
@@ -1022,6 +1033,11 @@ static void _sde_crtc_setup_blend_cfg(struct sde_crtc_mixer *mixer,
 
 	/* default to opaque blending */
 	fg_alpha = sde_plane_get_property(pstate, PLANE_PROP_ALPHA);
+	#ifdef CONFIG_VENDOR_EDIT
+	/*Mark.Yao@PSW.MM.Display.LCD.Stable,2019-01-12 support plane skip */
+	if (pstate->is_skip)
+		fg_alpha = 0;
+	#endif /* CONFIG_VENDOR_EDIT */
 	bg_alpha = 0xFF - fg_alpha;
 	blend_op = SDE_BLEND_FG_ALPHA_FG_CONST | SDE_BLEND_BG_ALPHA_BG_CONST;
 	blend_type = sde_plane_get_property(pstate, PLANE_PROP_BLEND_OP);
@@ -3101,7 +3117,6 @@ static void sde_crtc_frame_event_work(struct kthread_work *work)
 	spin_unlock_irqrestore(&sde_crtc->spin_lock, flags);
 	SDE_ATRACE_END("crtc_frame_event");
 }
-
 void sde_crtc_complete_commit(struct drm_crtc *crtc,
 		struct drm_crtc_state *old_state)
 {
@@ -5301,6 +5316,17 @@ static int _sde_crtc_check_secure_state(struct drm_crtc *crtc,
 	return 0;
 }
 
+#ifdef CONFIG_VENDOR_EDIT
+extern int oppo_dimlayer_hbm;
+extern int oppo_dimlayer_bl_alpha_value;
+extern int oppo_get_panel_brightness(void);
+extern int oppo_dimlayer_bl_enable;
+extern bool oppo_ffl_trigger_finish;
+int oppo_dimlayer_bl = 0;
+extern ktime_t oppo_backlight_time;
+extern u32 oppo_last_backlight;
+extern u32 oppo_backlight_delta;
+#endif /* CONFIG_VENDOR_EDIT */
 static int sde_crtc_atomic_check(struct drm_crtc *crtc,
 		struct drm_crtc_state *state)
 {
@@ -5782,6 +5808,14 @@ static void sde_crtc_install_properties(struct drm_crtc *crtc,
 				ARRAY_SIZE(e_cwb_data_points),
 				CRTC_PROP_CAPTURE_OUTPUT);
 
+#ifdef CONFIG_VENDOR_EDIT
+/* Gou shengjun@PSW.MM.Display.LCD.Feature,2018-11-21
+ * Support custom propertys
+*/
+	msm_property_install_range(&sde_crtc->property_info,"CRTC_CUST",
+		0x0, 0, INT_MAX, 0, CRTC_PROP_CUSTOM);
+#endif
+
 	msm_property_install_blob(&sde_crtc->property_info, "capabilities",
 		DRM_MODE_PROP_IMMUTABLE, CRTC_PROP_INFO);
 
@@ -5798,8 +5832,14 @@ static void sde_crtc_install_properties(struct drm_crtc *crtc,
 	if (catalog->has_dim_layer) {
 		msm_property_install_volatile_range(&sde_crtc->property_info,
 			"dim_layer_v1", 0x0, 0, ~0, 0, CRTC_PROP_DIM_LAYER_V1);
+#ifdef CONFIG_VENDOR_EDIT
+/*Mark.Yao@PSW.MM.Display.LCD.Stable,2019-04-17 fix dc backlight aging test fail */
+		sde_kms_info_add_keyint(info, "dim_layer_v1_max_layers",
+				SDE_MAX_DIM_LAYERS - 1);
+#else
 		sde_kms_info_add_keyint(info, "dim_layer_v1_max_layers",
 				SDE_MAX_DIM_LAYERS);
+#endif /* CONFIG_VENDOR_EDIT */
 	}
 
 	sde_kms_info_add_keyint(info, "hw_version", catalog->hwversion);
@@ -7014,7 +7054,7 @@ struct drm_crtc *sde_crtc_init(struct drm_device *dev, struct drm_plane *plane)
 	kthread_init_work(&sde_crtc->early_wakeup_work,
 					__sde_crtc_early_wakeup_work);
 
-	SDE_DEBUG("%s: successfully initialized crtc\n", sde_crtc->name);
+	SDE_ERROR("%s: successfully initialized crtc\n", sde_crtc->name);
 	return crtc;
 }
 
