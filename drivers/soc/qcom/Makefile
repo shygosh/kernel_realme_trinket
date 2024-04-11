@@ -123,3 +123,7 @@ obj-$(CONFIG_WCNSS_CORE) += wcnss/
 obj-$(CONFIG_RENAME_BLOCK_DEVICE) += rename_block_device.o
 obj-$(CONFIG_QTI_CRYPTO_COMMON) += crypto-qti-common.o
 obj-$(CONFIG_QTI_CRYPTO_TZ) += crypto-qti-tz.o
+ifeq ($(CONFIG_ODM_WT_EDIT),y)
+#Lijie.Yang@ODM_WT.BSP.Kernel.Security.1941873, 2020/03/20, add for add secboot_fuse_reg & serial_num node in /proc to get fuse status and cpuid
+obj-y += serial_num.o
+endif

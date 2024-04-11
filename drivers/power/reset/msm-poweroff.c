@@ -65,7 +65,7 @@ static void scm_disable_sdi(void);
  * There is no API from TZ to re-enable the registers.
  * So the SDI cannot be re-enabled when it already by-passed.
  */
-static int download_mode = 1;
+static int download_mode = IS_ENABLED(CONFIG_QCOM_DLOAD_MODE);
 static bool force_warm_reboot;
 
 #ifdef CONFIG_QCOM_DLOAD_MODE
@@ -309,6 +309,17 @@ static void msm_restart_prepare(const char *cmd)
 				(cmd != NULL && cmd[0] != '\0'));
 	}
 
+#ifdef CONFIG_VENDOR_EDIT
+	if (in_panic) {
+		//warm reset
+		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
+		qpnp_pon_set_restart_reason(PON_RESTART_REASON_KERNEL);
+		flush_cache_all();
+
+		return;
+	}
+#endif /* CONFIG_VENDOR_EDIT */
+
 	if (force_warm_reboot)
 		pr_info("Forcing a warm reset of the system\n");
 
@@ -318,6 +329,8 @@ static void msm_restart_prepare(const char *cmd)
 	else
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
 
+#ifndef CONFIG_VENDOR_EDIT
+/* OPPO 2013.07.09 hewei modify begin for restart mode*/
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			qpnp_pon_set_restart_reason(
@@ -357,6 +370,102 @@ static void msm_restart_prepare(const char *cmd)
 			__raw_writel(0x77665501, restart_reason);
 		}
 	}
+#else //CONFIG_VENDOR_EDIT
+	if (cmd != NULL) {
+		#ifndef DISABLE_FASTBOOT_CMDS //disable fastboot modem at release soft
+		if (!strncmp(cmd, "bootloader", 10)) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_BOOTLOADER);
+			__raw_writel(0x77665500, restart_reason);
+		} else 
+		#endif
+		if (!strncmp(cmd, "recovery", 8)) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_RECOVERY);
+			__raw_writel(0x77665502, restart_reason);
+		} else if (!strcmp(cmd, "rtc")) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_RTC);
+			__raw_writel(0x77665503, restart_reason);
+		} else if (!strcmp(cmd, "dm-verity device corrupted")) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_DMVERITY_CORRUPTED);
+			__raw_writel(0x77665508, restart_reason);
+		} else if (!strcmp(cmd, "dm-verity enforcing")) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_DMVERITY_ENFORCE);
+			__raw_writel(0x77665509, restart_reason);
+		} else if (!strcmp(cmd, "keys clear")) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_KEYS_CLEAR);
+			__raw_writel(0x7766550a, restart_reason);
+		//xiaofan.yang@PSW.TECH.AgingTest, 2019/01/07,Add for factory agingtest
+		} else if(!strcmp(cmd, "sbllowmemtest")){
+			qpnp_pon_set_restart_reason(
+					PON_RESTART_REASON_SBL_DDR_CUS);
+			__raw_writel(0x7766550b, restart_reason);
+		}else if (!strcmp(cmd, "sblmemtest")){//oppo factory aging test
+			printk("[%s:%d] lunch ddr test!!\n", current->comm, current->pid);
+			qpnp_pon_set_restart_reason(
+					PON_RESTART_REASON_SBL_DDRTEST);
+			__raw_writel(0x7766550b, restart_reason);
+		} else if(!strcmp(cmd, "usermemaging")){
+			printk("[%s:%d] lunch user memory test!!\n", current->comm, current->pid);
+			qpnp_pon_set_restart_reason(
+					PON_RESTART_REASON_MEM_AGING);
+			__raw_writel(0x7766550b, restart_reason);
+		} else if (!strncmp(cmd, "oem-", 4)) {
+			unsigned long code;
+			int ret;
+
+			ret = kstrtoul(cmd + 4, 16, &code);
+			if (!ret)
+				__raw_writel(0x6f656d00 | (code & 0xff),
+					     restart_reason);
+		} else if (!strncmp(cmd, "edl", 3)) {
+			enable_emergency_dload_mode();
+		} else if (!strncmp(cmd, "rf", 2)) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_RF);
+		} else if (!strncmp(cmd, "wlan", 4)) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_WLAN);
+		#ifdef USE_MOS_MODE
+		} else if (!strncmp(cmd, "mos", 3)) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_MOS);
+		#endif
+		} else if (!strncmp(cmd, "ftm", 3)) {
+			qpnp_pon_set_restart_reason(
+					PON_RESTART_REASON_FACTORY);
+		} else if (!strncmp(cmd, "kernel", 6)) {
+			qpnp_pon_set_restart_reason(
+					PON_RESTART_REASON_KERNEL);
+		} else if (!strncmp(cmd, "modem", 5)) {
+			qpnp_pon_set_restart_reason(
+					PON_RESTART_REASON_MODEM);
+		} else if (!strncmp(cmd, "android", 7)) {
+			qpnp_pon_set_restart_reason(
+					PON_RESTART_REASON_ANDROID);
+		} else if (!strncmp(cmd, "silence", 7)) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_SILENCE);
+		}else if (!strncmp(cmd, "sau", 3)) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_SAU);
+		} else if (!strncmp(cmd, "safe", 4)) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_SAFE);
+		} else {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_NORMAL);
+		}
+	}else{
+		qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_NORMAL);
+	}
+/* OPPO 2013.07.09 hewei modify en for restart mode*/
+#endif //CONFIG_VENDOR_EDIT
 
 	flush_cache_all();
 

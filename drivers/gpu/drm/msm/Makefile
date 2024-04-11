@@ -10,6 +10,7 @@ ccflags-$(CONFIG_DRM_SDE_SHD) += -Idrivers/gpu/drm/msm/shd
 ccflags-$(CONFIG_DRM_SDE_SHP) += -Idrivers/gpu/drm/msm/shp
 
 msm_drm-y := \
+	lm3697_bl.o \
 	dp/dp_usbpd.o \
 	dp/dp_parser.o \
 	dp/dp_power.o \
@@ -159,6 +160,8 @@ msm_drm-$(CONFIG_DRM_MSM_DSI_STAGING) += dsi-staging/dsi_phy.o \
 				dsi-staging/dsi_display.o \
 				dsi-staging/dsi_panel.o \
 				dsi-staging/dsi_clk_manager.o \
+				dsi-staging/dsi_oppo_support.o \
+				dsi-staging/oppo_display_private_api.o\
 				dsi-staging/dsi_display_test.o
 
 msm_drm-$(CONFIG_DSI_PARSER) += dsi-staging/dsi_parser.o

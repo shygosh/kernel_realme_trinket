@@ -1951,6 +1951,7 @@ static int spi_geni_suspend(struct device *dev)
 {
 	int ret = 0;
 
+#ifndef CONFIG_VENDOR_EDIT
 	if (!pm_runtime_status_suspended(dev)) {
 		struct spi_master *spi = get_spi_master(dev);
 		struct spi_geni_master *geni_mas = spi_master_get_devdata(spi);
@@ -1971,6 +1972,7 @@ static int spi_geni_suspend(struct device *dev)
 			ret = -EBUSY;
 		}
 	}
+#endif
 	return ret;
 }
 #else

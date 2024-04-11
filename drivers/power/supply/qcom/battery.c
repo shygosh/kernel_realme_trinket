@@ -28,6 +28,7 @@
 #include <linux/pmic-voter.h>
 #include <linux/workqueue.h>
 #include "battery.h"
+#include <soc/oppo/oppo_project.h>
 
 #define DRV_MAJOR_VERSION	1
 #define DRV_MINOR_VERSION	0
@@ -125,6 +126,7 @@ enum {
 };
 
 static int debug_mask;
+static int func_mini_parallel_fcc_ua(void);
 module_param_named(debug_mask, debug_mask, int, 0600);
 
 #define pl_dbg(chip, reason, fmt, ...)				\
@@ -832,6 +834,17 @@ skip_fcc_step_update:
 #define PL_TAPER_WORK_DELAY_MS		500
 #define TAPER_RESIDUAL_PCT		90
 #define TAPER_REDUCTION_UA		200000
+static int func_mini_parallel_fcc_ua(void){
+	int value_fcc_current;
+	int project_num = get_project();
+	if((project_num == 19375) || (project_num == 19376)){
+		value_fcc_current = MINIMUM_PARALLEL_FCC_UA * 2;
+	}else{
+		value_fcc_current = MINIMUM_PARALLEL_FCC_UA;
+	}
+	return value_fcc_current;
+}
+
 static void pl_taper_work(struct work_struct *work)
 {
 	struct pl_data *chip = container_of(work, struct pl_data,
@@ -854,7 +867,7 @@ static void pl_taper_work(struct work_struct *work)
 					chip->fcc_votable);
 			get_fcc_split(chip, total_fcc_ua, &master_fcc_ua,
 					&slave_fcc_ua);
-			if (slave_fcc_ua <= MINIMUM_PARALLEL_FCC_UA) {
+			if (slave_fcc_ua <= func_mini_parallel_fcc_ua()) {
 				pl_dbg(chip, PR_PARALLEL, "terminating: parallel's share is low\n");
 				vote(chip->pl_disable_votable, TAPER_END_VOTER,
 						true, 0);
@@ -980,7 +993,7 @@ static int pl_fcc_vote_callback(struct votable *votable, void *data,
 	 */
 	cp_fcc_ua = total_fcc_ua - chip->chg_param->forced_main_fcc;
 	pl_dbg(chip, PR_PARALLEL,
-		"cp_fcc_ua=%d total_fcc_ua=%d forced_main_fcc=%d\n",
+		"%s: cp_fcc_ua=%d total_fcc_ua=%d forced_main_fcc=%d\n", client?client:"NULL",
 		cp_fcc_ua, total_fcc_ua, chip->chg_param->forced_main_fcc);
 	if (cp_fcc_ua > 0) {
 		if (chip->cp_master_psy) {
@@ -1014,7 +1027,7 @@ static int pl_fcc_vote_callback(struct votable *votable, void *data,
 		get_fcc_split(chip, total_fcc_ua, &master_fcc_ua,
 				&slave_fcc_ua);
 
-		if (slave_fcc_ua > MINIMUM_PARALLEL_FCC_UA) {
+		if (slave_fcc_ua > func_mini_parallel_fcc_ua()) {
 			vote(chip->pl_disable_votable, PL_FCC_LOW_VOTER,
 							false, 0);
 		} else {
@@ -1110,7 +1123,7 @@ static void fcc_stepper_work(struct work_struct *work)
 	if (parallel_fcc < chip->slave_fcc_ua) {
 		/* Set parallel FCC */
 		if (chip->pl_psy && !chip->pl_disable) {
-			if (parallel_fcc < MINIMUM_PARALLEL_FCC_UA) {
+			if (parallel_fcc < func_mini_parallel_fcc_ua()) {
 				pval.intval = 1;
 				rc = power_supply_set_property(chip->pl_psy,
 					POWER_SUPPLY_PROP_INPUT_SUSPEND, &pval);
@@ -1168,7 +1181,7 @@ static void fcc_stepper_work(struct work_struct *work)
 			 * equal to minimum parallel FCC value.
 			 */
 			if (chip->pl_disable && parallel_fcc
-					>= MINIMUM_PARALLEL_FCC_UA) {
+					>= func_mini_parallel_fcc_ua()) {
 				pval.intval = 0;
 				rc = power_supply_set_property(chip->pl_psy,
 					POWER_SUPPLY_PROP_INPUT_SUSPEND, &pval);

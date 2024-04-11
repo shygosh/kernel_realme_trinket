@@ -1174,6 +1174,10 @@ struct dwc3 {
 	unsigned		tx_de_emphasis_quirk:1;
 	unsigned		ssp_u3_u0_quirk:1;
 	unsigned		tx_de_emphasis:2;
+#ifdef CONFIG_VENDOR_EDIT
+  /* zhangkun@BSP.CHG.Basic, 2019/04/26,  add for OTG sw */
+	unsigned		is_drd:1;
+#endif
 	unsigned		err_evt_seen:1;
 	unsigned		disable_clk_gating:1;
 	unsigned		enable_bus_suspend:1;
