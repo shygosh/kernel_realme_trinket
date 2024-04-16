@@ -321,6 +321,14 @@ static int wcd_check_cross_conn(struct wcd_mbhc *mbhc)
 		goto done;
 	}
 
+#ifdef CONFIG_VENDOR_EDIT
+	/*pangbin1@wingtech.com, 2019/9/4, add for cross_conn recognition error*/
+	if (hphl_adc_res > 100 && hphr_adc_res < 100 && (hphl_adc_res - hphr_adc_res) >= 500) {
+		pr_warn("%s: hphl_adc_res recognition error\n", __func__);
+		plug_type = MBHC_PLUG_TYPE_INVALID;
+		goto done;
+	}
+#endif
 	if (hphl_adc_res > 100 || hphr_adc_res > 100) {
 		plug_type = MBHC_PLUG_TYPE_GND_MIC_SWAP;
 		pr_debug("%s: Cross connection identified\n", __func__);
@@ -348,6 +356,11 @@ done:
 
 	pr_debug("%s: leave, plug type: %d\n", __func__,  plug_type);
 
+#ifdef CONFIG_VENDOR_EDIT
+	/*pangbin1@wingtech.com, 2019/9/4, add for cross_conn recognition error*/
+	if (plug_type == MBHC_PLUG_TYPE_INVALID)
+		return -1;
+#endif
 	return (plug_type == MBHC_PLUG_TYPE_GND_MIC_SWAP) ? true : false;
 }
 
@@ -555,6 +568,11 @@ static void wcd_mbhc_adc_detect_plug_type(struct wcd_mbhc *mbhc)
 	struct snd_soc_codec *codec = mbhc->codec;
 
 	pr_debug("%s: enter\n", __func__);
+	#ifdef CONFIG_VENDOR_EDIT
+	// Ming.Liu@MM.Audiodriver.Machine, 2019/08/27, Modify for pop noise
+	msleep(400);
+	#endif /* CONFIG_VENDOR_EDIT */
+
 	WCD_MBHC_RSC_ASSERT_LOCKED(mbhc);
 
 	if (mbhc->mbhc_cb->hph_pull_down_ctrl)
@@ -579,8 +597,16 @@ static void wcd_mbhc_adc_detect_plug_type(struct wcd_mbhc *mbhc)
 static void wcd_micbias_disable(struct wcd_mbhc *mbhc)
 {
 	if (mbhc->micbias_enable) {
+		#ifndef CONFIG_VENDOR_EDIT
+		/* Zhaoan.Xu@Multimedia.AudioDriver.Stability, 2019/04/11, Modify for checklist 861440*/
 		mbhc->mbhc_cb->mbhc_micb_ctrl_thr_mic(
 			mbhc->codec, MIC_BIAS_2, false);
+		#else
+		if (mbhc->mbhc_cb->mbhc_micb_ctrl_thr_mic) {
+			mbhc->mbhc_cb->mbhc_micb_ctrl_thr_mic(
+			    mbhc->codec, MIC_BIAS_2, false);
+		}
+		#endif /* CONFIG_VENDOR_EDIT */
 		if (mbhc->mbhc_cb->set_micbias_value)
 			mbhc->mbhc_cb->set_micbias_value(
 					mbhc->codec);
@@ -615,10 +641,20 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 	enum wcd_mbhc_plug_type plug_type = MBHC_PLUG_TYPE_INVALID;
 	unsigned long timeout;
 	bool wrk_complete = false;
+	#ifndef CONFIG_VENDOR_EDIT
+	/*xiang.fei@PSW.MM.AudioDriver.HeadsetDet, 2017/03/03,
+	 *Delete for headset detect.
+	 */
 	int pt_gnd_mic_swap_cnt = 0;
 	int no_gnd_mic_swap_cnt = 0;
+	#endif
 	bool is_pa_on = false, spl_hs = false, spl_hs_reported = false;
+	#ifndef CONFIG_VENDOR_EDIT
+	/*xiang.fei@PSW.MM.AudioDriver.HeadsetDet, 2017/03/03,
+	 *Delete for headset detect.
+	 */
 	int ret = 0;
+	#endif
 	int spl_hs_count = 0;
 	int output_mv = 0;
 	int cross_conn;
@@ -639,7 +675,19 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 	WCD_MBHC_RSC_UNLOCK(mbhc);
 
 	/* Check for cross connection */
+#ifdef CONFIG_VENDOR_EDIT
+	/*pangbin1@wingtech.com, 2019/9/4, add for cross_conn recognition error*/
+	cross_conn = wcd_check_cross_conn(mbhc);
+	if (cross_conn >= 0)
+		try++;
+#endif
+
 	do {
+#ifdef CONFIG_VENDOR_EDIT
+		/*pangbin1@wingtech.com, 2019/9/4, add for cross_conn recognition error*/
+		if (cross_conn < 0)
+			msleep(500);
+#endif
 		cross_conn = wcd_check_cross_conn(mbhc);
 		try++;
 	} while (try < mbhc->swap_thr);
@@ -654,13 +702,29 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 	output_mv = wcd_measure_adc_continuous(mbhc);
 	plug_type = wcd_mbhc_get_plug_from_adc(mbhc, output_mv);
 
+#ifdef CONFIG_VENDOR_EDIT
+	/*pangbin1@wingtech.com, 2019/8/16, add for plug and unplug frequently*/
+	if ((plug_type == MBHC_PLUG_TYPE_HEADSET ||
+	     plug_type == MBHC_PLUG_TYPE_HEADPHONE) &&
+	     mbhc->delayed_time > 0)
+	     goto correct_plug_type;
+#endif
+
+
 	/*
 	 * Report plug type if it is either headset or headphone
 	 * else start the 3 sec loop
 	 */
+#ifndef CONFIG_VENDOR_EDIT
 	if ((plug_type == MBHC_PLUG_TYPE_HEADSET ||
 	     plug_type == MBHC_PLUG_TYPE_HEADPHONE) &&
 	    (!wcd_swch_level_remove(mbhc))) {
+#else
+	if ((plug_type == MBHC_PLUG_TYPE_HEADSET ||
+	     plug_type == MBHC_PLUG_TYPE_HEADPHONE) &&
+	    (!wcd_swch_level_remove(mbhc)) &&
+		(output_mv != 0)) {
+#endif
 		WCD_MBHC_RSC_LOCK(mbhc);
 		wcd_mbhc_find_plug_and_report(mbhc, plug_type);
 		WCD_MBHC_RSC_UNLOCK(mbhc);
@@ -704,7 +768,13 @@ correct_plug_type:
 			goto exit;
 		}
 
+#ifndef CONFIG_VENDOR_EDIT
+		/*pangbin1@wingtech.com, 2019/8/16, add for plug and unplug frequently*/
 		msleep(180);
+#else
+		msleep(180 + mbhc->delayed_time);
+#endif
+
 		/*
 		 * Use ADC single mode to minimize the chance of missing out
 		 * btn press/release for HEADSET type during correct work.
@@ -717,15 +787,27 @@ correct_plug_type:
 		 */
 		plug_type = wcd_mbhc_get_plug_from_adc(mbhc, output_mv);
 
+		#ifndef CONFIG_VENDOR_EDIT
+		/* Zhao.Pan@PSW.MM.AudioDriver.AudioDriver.HeadsetDet,
+		 * 2019/01/28, Add for headset threshold compare */
+		if ((output_mv > WCD_MBHC_ADC_HS_THRESHOLD_MV) &&
+		#else
 		if ((output_mv > hs_threshold) &&
+		#endif /* CONFIG_VENDOR_EDIT */
 		    (spl_hs_count < WCD_MBHC_SPL_HS_CNT)) {
 			spl_hs = wcd_mbhc_adc_check_for_spl_headset(mbhc,
 								&spl_hs_count);
 			output_mv = wcd_measure_adc_once(mbhc, MUX_CTL_IN2P);
 
 			if (spl_hs_count == WCD_MBHC_SPL_HS_CNT) {
+				#ifndef CONFIG_VENDOR_EDIT
+				/* Zhao.Pan@PSW.MM.AudioDriver.AudioDriver.HeadsetDet,
+				 * 2019/01/28, Add for headset threshold compare */
 				hs_threshold = (hs_threshold *
 				     wcd_mbhc_get_micbias(mbhc)) / micbias_mv;
+				#else
+				output_mv = hs_threshold;
+				#endif /* CONFIG_VENDOR_EDIT */
 				spl_hs = true;
 				mbhc->micbias_enable = true;
 			}
@@ -734,6 +816,10 @@ correct_plug_type:
 		if (mbhc->mbhc_cb->hph_pa_on_status)
 			is_pa_on = mbhc->mbhc_cb->hph_pa_on_status(mbhc->codec);
 
+		#ifndef CONFIG_VENDOR_EDIT
+		/*xiang.fei@PSW.MM.AudioDriver.HeadsetDet, 2017/03/03,
+		*Delete for headset detect.
+		*/
 		if ((output_mv <= hs_threshold) &&
 		    (!is_pa_on)) {
 			/* Check for cross connection*/
@@ -787,8 +873,15 @@ correct_plug_type:
 				}
 			}
 		}
+		#endif
 
+		#ifndef CONFIG_VENDOR_EDIT
+		/* Zhao.Pan@PSW.MM.AudioDriver.AudioDriver.HeadsetDet,
+		 * 2019/01/28, Add for headset threshold compare */
+		if (output_mv > WCD_MBHC_ADC_HS_THRESHOLD_MV) {
+		#else
 		if (output_mv > hs_threshold) {
+		#endif /* CONFIG_VENDOR_EDIT */
 			pr_debug("%s: cable is extension cable\n", __func__);
 			plug_type = MBHC_PLUG_TYPE_HIGH_HPH;
 			wrk_complete = true;

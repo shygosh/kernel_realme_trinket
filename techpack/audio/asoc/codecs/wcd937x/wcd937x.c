@@ -32,6 +32,8 @@
 #include "../msm-cdc-pinctrl.h"
 #include <dt-bindings/sound/audio-codec-port-types.h>
 #include "../msm-cdc-supply.h"
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
 
 #define WCD9370_VARIANT 0
 #define WCD9375_VARIANT 5
@@ -1681,6 +1683,43 @@ static int wcd937x_codec_enable_vdd_buck(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+#ifdef CONFIG_ODM_WT_EDIT
+//Yue.Li@ODM_WT.mm.audiodriver.Machine, 2020/03/19, Modify for speaker
+#define AW_PA_MODE 3
+static int ext_spk_pa_enable(struct snd_soc_dapm_widget *w,
+						struct snd_kcontrol *kcontrol,
+						int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct wcd937x_priv *wcd937x = snd_soc_codec_get_drvdata(codec);
+	struct wcd937x_pdata *pdata = NULL;
+	int ret;
+
+	pdata = dev_get_platdata(wcd937x->dev);
+	if (!pdata->ext_pa_gpio) {
+		pr_err("%s: Invalid gpio: %d\n", __func__, pdata->ext_pa_gpio);
+		return false;
+	}
+
+	dev_dbg(codec->dev, "%s: %s event = %d\n", __func__, w->name, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		for(ret = 0; ret < AW_PA_MODE; ret++) {
+			gpio_direction_output(pdata->ext_pa_gpio, false);
+			gpio_direction_output(pdata->ext_pa_gpio, true);
+		}
+		usleep_range(13000, 13000 + 2000);
+		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		gpio_direction_output(pdata->ext_pa_gpio, false);
+		usleep_range(3000, 3000 + 2000);
+		break;
+	}
+	return 0;
+}
+#endif // CONFIG_ODM_WT_EDIT
+
 static const char * const rx_hph_mode_mux_text[] = {
 	"CLS_H_INVALID", "CLS_H_HIFI", "CLS_H_LP", "CLS_AB", "CLS_H_LOHIFI",
 	"CLS_H_ULP", "CLS_AB_HIFI",
@@ -1922,6 +1961,10 @@ static const struct snd_soc_dapm_widget wcd937x_dapm_widgets[] = {
 	SND_SOC_DAPM_OUTPUT("AUX"),
 	SND_SOC_DAPM_OUTPUT("HPHL"),
 	SND_SOC_DAPM_OUTPUT("HPHR"),
+	#ifdef CONFIG_ODM_WT_EDIT
+	//Yue.Li@ODM_WT.mm.audiodriver.Machine, 2020/03/19, Modify for speaker
+	SND_SOC_DAPM_SPK("Ext PA", ext_spk_pa_enable),
+	#endif // CONFIG_ODM_WT_EDIT
 
 };
 
@@ -2034,6 +2077,11 @@ static const struct snd_soc_dapm_route wcd937x_audio_map[] = {
 	{"AUX_RDAC", "Switch", "RDAC4"},
 	{"AUX PGA", NULL, "AUX_RDAC"},
 	{"AUX", NULL, "AUX PGA"},
+
+	#ifdef CONFIG_ODM_WT_EDIT
+	//Gong.Chen@ODM_WT.mm.audiodriver.Machine, 2019/04/08, Modify for speaker
+	{"Ext PA", NULL, "AUX"},
+	#endif // CONFIG_ODM_WT_EDIT
 
 	{"RDAC3_MUX", "RX3", "RX3"},
 	{"RDAC3_MUX", "RX1", "RX1"},
@@ -2296,6 +2344,11 @@ static int wcd937x_soc_codec_probe(struct snd_soc_codec *codec)
 	snd_soc_dapm_ignore_suspend(dapm, "AUX");
 	snd_soc_dapm_ignore_suspend(dapm, "HPHL");
 	snd_soc_dapm_ignore_suspend(dapm, "HPHR");
+	#ifdef CONFIG_ODM_WT_EDIT
+	//Yue.Li@ODM_WT.mm.audiodriver.Machine, 2020/03/19, Modify for speaker
+	snd_soc_dapm_ignore_suspend(dapm, "Ext PA");
+	#endif // CONFIG_ODM_WT_EDIT
+
 	snd_soc_dapm_sync(dapm);
 
 	wcd_cls_h_init(&wcd937x->clsh_info);
@@ -2592,6 +2645,15 @@ struct wcd937x_pdata *wcd937x_populate_dt_data(struct device *dev)
 	pdata->tx_slave = of_parse_phandle(dev->of_node, "qcom,tx-slave", 0);
 	wcd937x_dt_parse_micbias_info(dev, &pdata->micbias);
 
+	#ifdef CONFIG_ODM_WT_EDIT
+	//Yue.Li@ODM_WT.mm.audiodriver.Machine, 2020/03/23, Modify for speaker
+	pdata->ext_pa_gpio = of_get_named_gpio(dev->of_node, "qcom,ext-pa-gpio", 0);
+	if (pdata->ext_pa_gpio > 0) {
+		if (gpio_request(pdata->ext_pa_gpio, "pa_gpio") < 0)
+			pr_err("%s ext_pa_gpio request failed!\n", __func__);
+	}
+	#endif // CONFIG_ODM_WT_EDIT
+
 	return pdata;
 }
 
@@ -2686,7 +2748,12 @@ static int wcd937x_bind(struct device *dev)
 	 * soundwire auto enumeration of slave devices as
 	 * as per HW requirement.
 	 */
+	#ifndef CONFIG_VENDOR_EDIT
+	/* Wang.kun@MM.AudioDriver.Machine.2156142, 2019/07/18, add for sound card bind */
 	usleep_range(5000, 5010);
+	#else
+	usleep_range(100000, 100010);
+	#endif /* CONFIG_VENDOR_EDIT */
 	wcd937x->wakeup = wcd937x_wakeup;
 
 	ret = component_bind_all(dev, wcd937x);

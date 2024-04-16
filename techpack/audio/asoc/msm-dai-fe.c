@@ -576,6 +576,27 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 		.probe = fe_dai_probe,
 	},
 	{
+		#ifdef CONFIG_VENDOR_EDIT
+		/*Jianfeng.Qiu@PSW.MM.AudioDriver.Machine, 2019/08/31, Add for loopback test*/
+		.playback = {
+			.stream_name = "TX3_CDC_DMA_HOSTLESS Playback",
+			.aif_name = "TX3_CDC_DMA_DL_HL",
+			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 |
+				SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 |
+				SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 |
+				SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_88200 |
+				SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_176400 |
+				SNDRV_PCM_RATE_192000 | SNDRV_PCM_RATE_352800 |
+				SNDRV_PCM_RATE_384000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S24_3LE,
+			.channels_min = 1,
+			.channels_max = 4,
+			.rate_min = 8000,
+			.rate_max = 384000,
+		},
+		#endif /* CONFIG_VENDOR_EDIT */
 		.capture = {
 			.stream_name = "TX3_CDC_DMA_HOSTLESS Capture",
 			.aif_name = "TX3_CDC_DMA_UL_HL",
