@@ -5,6 +5,7 @@
 #include "realme-trinket-display.dtsi"
 #include "realme-trinket-fingerprint.dtsi"
 #include "realme-trinket-memory.dtsi"
+#include "realme-trinket-nfc.dtsi"
 #include "realme-trinket-pinctrl.dtsi"
 #include "realme-trinket-pm6125.dtsi"
 #include "realme-trinket-pmi632.dtsi"

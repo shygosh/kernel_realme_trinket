@@ -1,0 +1,23 @@
+&qupv3_se1_i2c {
+	nq@28 {
+		status = "disabled";
+	};
+
+	pn544@28 {
+		compatible = "nxp,pn544";
+		reg = <0x28>;
+		nxp,pn544-irq = <&tlmm 85 0x00>;
+		nxp,pn544-ven = <&tlmm 83 0x00>;
+		nxp,pn544-fw-dwnld = <&tlmm 84 0x00>;
+		nxp,pn544-clkreq = <&tlmm 95 0x00>;
+		nxp,pn544-ese-pwr = <&tlmm 86 0x00>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <85 0>;
+		interrupt-names = "nfc_irq";
+		pinctrl-names = "nfc_active", "nfc_suspend";
+		pinctrl-0 = <&nfc_int_active &nfc_enable_active
+				&nfc_clk_req_active>;
+		pinctrl-1 = <&nfc_int_suspend &nfc_enable_suspend
+				&nfc_clk_req_suspend>;
+	};
+};
