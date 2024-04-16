@@ -65,3 +65,7 @@
 #define CONFIG_TDM_DISABLE 1
 #define CONFIG_MI2S_DISABLE 1
 #define CONFIG_AUXPCM_DISABLE 1
+#ifndef CONFIG_VENDOR_EDIT
+/*huanli.chang@PSW.MM.AudioDriver.Machine,2019/04/03, Add for audio bringup*/
+#define CONFIG_VENDOR_EDIT 1
+#endif /* CONFIG_VENDOR_EDIT */

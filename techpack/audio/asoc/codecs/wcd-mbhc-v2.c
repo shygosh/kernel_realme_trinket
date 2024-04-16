@@ -307,8 +307,27 @@ out_micb_en:
 			/* enable pullup and cs, disable mb */
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_PULLUP);
 		else
+			#ifndef CONFIG_VENDOR_EDIT
+			/* Jianfeng.Qiu@PSW.MM.AudioDriver.HeadsetDet, 2017/04/10,
+			 * 1.Modify for some headset button not work after headset mic
+			 * stop use.(ex: stop recording, hangup voice call without plug
+			 * out headset).
+			 * 2. Modify for headphone wrong detect as headset.1247369.
+			 * step: plug out headset when recording or in voice call,
+			 * then plug in a headphone, it detect as headset.
+			 */
 			/* enable current source and disable mb, pullup*/
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
+			#else /* CONFIG_VENDOR_EDIT */
+			{
+				pr_info("%s: current_plug %d\n", __func__, mbhc->current_plug);
+				if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET) {
+					wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
+				} else {
+					wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
+				}
+			}
+			#endif /* CONFIG_VENDOR_EDIT */
 
 		/* configure cap settings properly when micbias is disabled */
 		if (mbhc->mbhc_cb->set_cap_mode)
@@ -738,13 +757,26 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 
 		mbhc->hph_status |= jack_type;
 
+		#ifndef CONFIG_VENDOR_EDIT
+		/*huanli.chang@Multimedia.AudioDriver.HeadsetDet, 2019/10/22, Modify for log*/
 		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
 			 jack_type, mbhc->hph_status);
+		#else
+		pr_debug("%s: Reporting insertion jack_type=%d(hph_status=%x) [1:headphone 3:headset 4:lineout]\n", __func__,
+			 jack_type, mbhc->hph_status);
+		#endif
 		wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 				    (mbhc->hph_status | SND_JACK_MECHANICAL),
 				    WCD_MBHC_JACK_MASK);
 		wcd_mbhc_clr_and_turnon_hph_padac(mbhc);
 	}
+
+#ifdef CONFIG_ODM_WT_EDIT
+//Bo.Zhang@ODM_WT.BSP.TP,2020/04/05, added for TP headset function begain
+	headset_notifier_call_chain(insertion,NULL);
+//Bo.Zhang@ODM_WT.BSP.TP,2020/04/05, added for TP headset function end
+#endif /* CONFIG_ODM_WT_EDIT */
+	
 	pr_debug("%s: leave hph_status %x\n", __func__, mbhc->hph_status);
 }
 EXPORT_SYMBOL(wcd_mbhc_report_plug);
@@ -933,6 +965,13 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 
 	if ((mbhc->current_plug == MBHC_PLUG_TYPE_NONE) &&
 	    detection_type) {
+#ifdef CONFIG_VENDOR_EDIT
+		/*pangbin1@wingtech.com, 2019/8/16, add for plug and unplug frequently*/
+		if(!time_after(jiffies, mbhc->last_unplug_time + msecs_to_jiffies(1 * 1000)))
+			mbhc->delayed_time = 300;
+		else
+			mbhc->delayed_time = 0;
+#endif
 
 		/* If moisture is present, then enable polling, disable
 		 * moisture detection and wait for interrupt
@@ -1037,8 +1076,36 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 				mbhc->mbhc_cb->mbhc_moisture_detect_en(mbhc,
 									false);
 		}
+#ifdef CONFIG_VENDOR_EDIT
+		/*pangbin1@wingtech.com, 2019/8/16, add for plug and unplug frequently*/
+		mbhc->last_unplug_time = jiffies;
+#endif
 
 	} else if (!detection_type) {
+		#ifdef CONFIG_VENDOR_EDIT
+		/*Jianfeng.Qiu@PSW.MM.AudioDriver.HeadsetDet.2784831, 2020/01/20,
+		 *Add for disable micbias, when insert a HPH_HIGH device and detect as special
+		 *headset device(micbias_enable is true), then remove device before report
+		 *headset type, the micbias will remain enable.
+		 */
+		if (mbhc->micbias_enable) {
+			pr_info("%s: Need to disable MIC_BIAS_2\n", __func__);
+			if (mbhc->mbhc_cb->mbhc_micbias_control)
+				mbhc->mbhc_cb->mbhc_micbias_control(
+						codec, MIC_BIAS_2,
+						MICB_DISABLE);
+			if (mbhc->mbhc_cb->mbhc_micb_ctrl_thr_mic)
+				mbhc->mbhc_cb->mbhc_micb_ctrl_thr_mic(
+						codec,
+						MIC_BIAS_2, false);
+			if (mbhc->mbhc_cb->set_micbias_value) {
+				mbhc->mbhc_cb->set_micbias_value(codec);
+				WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MICB_CTRL, 0);
+			}
+			mbhc->micbias_enable = false;
+		}
+		#endif /* CONFIG_VENDOR_EDIT */
+
 		/* Disable external voltage source to micbias if present */
 		if (mbhc->mbhc_cb->enable_mb_source)
 			mbhc->mbhc_cb->enable_mb_source(mbhc, false);
@@ -2052,6 +2119,11 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 	mbhc->hph_type = WCD_MBHC_HPH_NONE;
 	mbhc->wcd_mbhc_regs = wcd_mbhc_regs;
 	mbhc->swap_thr = GND_MIC_SWAP_THRESHOLD;
+#ifdef CONFIG_VENDOR_EDIT
+	/*pangbin1@wingtech.com, 2019/8/16, add for plug and unplug frequently*/
+	mbhc->delayed_time = 0;
+	mbhc->last_unplug_time = 0;
+#endif
 
 	if (mbhc->intr_ids == NULL) {
 		pr_err("%s: Interrupt mapping not provided\n", __func__);

@@ -68,6 +68,10 @@ static void adsp_load_fw(struct work_struct *adsp_ldr_work)
 	int rc = 0;
 	u32 adsp_state;
 	const char *img_name;
+#ifdef CONFIG_VENDOR_EDIT
+//zhye@BSP.Sensor, 2019-06-10, add for multi adsp fw load
+	const char *adsp_img;
+#endif
 
 	if (!pdev) {
 		dev_err(&pdev->dev, "%s: Platform device null\n", __func__);
@@ -137,7 +141,23 @@ load_adsp:
 				goto fail;
 			}
 
+#ifdef CONFIG_VENDOR_EDIT
+//zhye@BSP.Sensor, 2019-06-10, add for multi adsp fw load
+			rc = of_property_read_string(pdev->dev.of_node,
+							"adsp-firmware",
+							&adsp_img);
+			if (rc) {
+				dev_dbg(&pdev->dev,
+					"%s: loading default image ADSP\n", __func__);
+				adsp_img = NULL;
+			}
+			else
+				dev_err(&pdev->dev, "%s: adsp-firmware = %s\n",__func__, adsp_img);
+
+			priv->pil_h = subsystem_get_with_fwname("adsp", adsp_img);
+#else//CONFIG_VENDOR_EDIT
 			priv->pil_h = subsystem_get("adsp");
+#endif//CONFIG_VENDOR_EDIT
 			if (IS_ERR(priv->pil_h)) {
 				dev_err(&pdev->dev, "%s: pil get failed,\n",
 					__func__);

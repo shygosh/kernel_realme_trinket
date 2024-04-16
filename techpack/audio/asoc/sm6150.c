@@ -651,7 +651,12 @@ static int msm_aux_codec_init(struct snd_soc_component *component);
 static struct wcd_mbhc_config wcd_mbhc_cfg = {
 	.read_fw_bin = false,
 	.calibration = NULL,
+	#ifndef CONFIG_VENDOR_EDIT
+	/*huanli.chang@Multimedia.AudioDriver.HeadsetDet, 2019/10/22, Modify for headset detect*/
 	.detect_extn_cable = true,
+	#else
+	.detect_extn_cable = false,
+	#endif
 	.mono_stero_detection = false,
 	.swap_gnd_mic = NULL,
 	.hs_ext_micbias = true,
@@ -664,7 +669,12 @@ static struct wcd_mbhc_config wcd_mbhc_cfg = {
 	.key_code[6] = 0,
 	.key_code[7] = 0,
 	.linein_th = 5000,
+	#ifndef CONFIG_VENDOR_EDIT
+	/*huanli.chang@PSW.MM.AudioDriver.HeadsetDET,2019/10/22,  Disable qcom moisture det*/
 	.moisture_en = true,
+	#else
+	.moisture_en = false,
+	#endif
 	.mbhc_micbias = MIC_BIAS_2,
 	.anc_micbias = MIC_BIAS_2,
 	.enable_anc_mic_detect = false,
@@ -5183,7 +5193,14 @@ static void *def_wcd_mbhc_cal(void)
 		return NULL;
 
 #define S(X, Y) ((WCD_MBHC_CAL_PLUG_TYPE_PTR(wcd_mbhc_cal)->X) = (Y))
+	#ifndef CONFIG_VENDOR_EDIT
+	/* Le.Li@PSW.MM.AudioDriver.HeadsetDet.AD8, 2019/04/15,
+	* Modify the threshold value of mic irq.
+	*/
 	S(v_hs_max, 1600);
+	#else
+	S(v_hs_max, 1700);
+	#endif
 #undef S
 #define S(X, Y) ((WCD_MBHC_CAL_BTN_DET_PTR(wcd_mbhc_cal)->X) = (Y))
 	S(num_btn, WCD_MBHC_DEF_BUTTONS);
@@ -5194,7 +5211,12 @@ static void *def_wcd_mbhc_cal(void)
 		(sizeof(btn_cfg->_v_btn_low[0]) * btn_cfg->num_btn);
 
 	btn_high[0] = 75;
+	#ifndef CONFIG_ODM_WT_EDIT
+	//Yue.Li@ODM_WT.mm.audiodriver.Machine, 2020/03/27, Modify for headset follow P
 	btn_high[1] = 150;
+	#else
+	btn_high[1] = 130;
+	#endif // CONFIG_ODM_WT_EDIT
 	btn_high[2] = 237;
 	btn_high[3] = 500;
 	btn_high[4] = 500;
@@ -6582,6 +6604,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 		.cpu_dai_name = "TX3_CDC_DMA_HOSTLESS",
 		.platform_name = "msm-pcm-hostless",
 		.dynamic = 1,
+		#ifdef CONFIG_VENDOR_EDIT
+		/*Jianfeng.Qiu@PSW.MM.AudioDriver.Machine, 2017/02/20, Add for loopback test*/
+		.dpcm_playback = 1,
+		#endif /* CONFIG_VENDOR_EDIT */
 		.dpcm_capture = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 			    SND_SOC_DPCM_TRIGGER_POST},
