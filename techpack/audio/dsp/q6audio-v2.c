@@ -359,6 +359,10 @@ int q6audio_get_port_index(u16 port_id)
 	default: return -EINVAL;
 	}
 }
+#ifdef CONFIG_VENDOR_EDIT
+//He.Lu@Mutilmedia.AudioDriver, 2019/12/18, add for homer
+EXPORT_SYMBOL(q6audio_get_port_index);
+#endif
 
 int q6audio_get_port_id(u16 port_id)
 {
