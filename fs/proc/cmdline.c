@@ -58,7 +58,8 @@ static int __init proc_cmdline_init(void)
 {
 	strcpy(new_command_line, saved_command_line);
 
-	patch_sar_flags(new_command_line);
+	if (super_partition)
+		patch_sar_flags(new_command_line);
 
 	proc_create("cmdline", 0, NULL, &cmdline_proc_fops);
 	return 0;
