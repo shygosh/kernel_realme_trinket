@@ -612,7 +612,7 @@ static int __initdata do_skip_initramfs;
 
 static int __init skip_initramfs_param(char *str)
 {
-	if (*str)
+	if (*str || super_partition)
 		return 0;
 	do_skip_initramfs = 1;
 	return 1;
