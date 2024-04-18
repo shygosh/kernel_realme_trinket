@@ -125,6 +125,7 @@ extern initcall_t __security_initcall_start[], __security_initcall_end[];
 typedef void (*ctor_fn_t)(void);
 
 /* Defined in init/main.c */
+extern bool super_partition;
 extern int do_one_initcall(initcall_t fn);
 extern char __initdata boot_command_line[];
 extern char *saved_command_line;
