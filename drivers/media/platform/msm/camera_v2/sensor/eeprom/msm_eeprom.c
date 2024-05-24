@@ -437,10 +437,10 @@ static int eeprom_parse_memory_map(struct msm_eeprom_ctrl_t *e_ctrl,
 				int x = 0;
 				const int inc = 5;
 				const int nunit = 2;
-				const int cnBatch = inc * nunit;
-				const int cnLimit =
+				const cnBatch = inc * nunit;
+				const cnLimit =
 					mem_setting.reg_data / cnBatch * inc;
-				const int cnNotYet =
+				const cnNotYet =
 					mem_setting.reg_data % cnBatch;
 
 				e_ctrl->i2c_client.addr_type =
