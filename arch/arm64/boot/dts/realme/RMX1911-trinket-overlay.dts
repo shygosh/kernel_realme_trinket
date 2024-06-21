@@ -21,6 +21,7 @@
 / {
 	model = "Qualcomm Technologies, Inc. TRINKET IDP";
 	compatible = "qcom,trinket-idp", "qcom,trinket", "qcom,idp";
+	overlay-id = "phantom";
 	qcom,msm-id = <394 0x10000>;
 	qcom,board-id = <34 0>;
 	oppo,dtsi_no = <19631>;
