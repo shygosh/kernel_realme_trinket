@@ -41,6 +41,10 @@
 #include "cpudeadline.h"
 #include "cpuacct.h"
 
+// HACK: Force always_inline for sched subdir
+#undef inline
+#define inline __attribute__((always_inline, unused)) notrace __gnu_inline
+
 #ifdef CONFIG_SCHED_DEBUG
 # define SCHED_WARN_ON(x)	WARN_ONCE(x, #x)
 #else
