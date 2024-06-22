@@ -1,4 +1,5 @@
 
+#include <linux/binfmts.h>
 #include <linux/wait.h>
 #include <linux/backing-dev.h>
 #include <linux/kthread.h>
@@ -146,6 +147,9 @@ static ssize_t read_ahead_kb_store(struct device *dev,
 	struct backing_dev_info *bdi = dev_get_drvdata(dev);
 	unsigned long read_ahead_kb;
 	ssize_t ret;
+
+	if (task_is_booster(current))
+		return count;
 
 	ret = kstrtoul(buf, 10, &read_ahead_kb);
 	if (ret < 0)

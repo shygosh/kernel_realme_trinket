@@ -45,8 +45,8 @@ struct blk_queue_stats;
 struct blk_stat_callback;
 struct keyslot_manager;
 
-#define BLKDEV_MIN_RQ	4
-#define BLKDEV_MAX_RQ	128	/* Default maximum */
+#define BLKDEV_MIN_RQ	1
+#define BLKDEV_MAX_RQ	64	/* Default maximum */
 
 /* Must be consisitent with blk_mq_poll_stats_bkt() */
 #define BLK_MQ_POLL_STATS_BKTS 16
@@ -665,15 +665,16 @@ struct request_queue {
 #define QUEUE_FLAG_QUIESCED    28	/* queue has been quiesced */
 #define QUEUE_FLAG_PREEMPT_ONLY 29	/* only process REQ_PREEMPT requests */
 
-#define QUEUE_FLAG_DEFAULT	((1 << QUEUE_FLAG_IO_STAT) |		\
-				 (1 << QUEUE_FLAG_STACKABLE)	|	\
-				 (1 << QUEUE_FLAG_SAME_COMP)	|	\
-				 (1 << QUEUE_FLAG_ADD_RANDOM))
+#define QUEUE_FLAG_DEFAULT ((1 << QUEUE_FLAG_SAME_COMP) | \
+			(1 << QUEUE_FLAG_SAME_FORCE) | \
+			(1 << QUEUE_FLAG_STACKABLE) | \
+			(1 << QUEUE_FLAG_NONROT))
 
-#define QUEUE_FLAG_MQ_DEFAULT	((1 << QUEUE_FLAG_IO_STAT) |		\
-				 (1 << QUEUE_FLAG_STACKABLE)	|	\
-				 (1 << QUEUE_FLAG_SAME_COMP)	|	\
-				 (1 << QUEUE_FLAG_POLL))
+#define QUEUE_FLAG_MQ_DEFAULT ((1 << QUEUE_FLAG_SAME_COMP) | \
+			(1 << QUEUE_FLAG_SAME_FORCE) | \
+			(1 << QUEUE_FLAG_STACKABLE) | \
+			(1 << QUEUE_FLAG_NONROT) | \
+			(1 << QUEUE_FLAG_POLL))
 
 /*
  * @q->queue_lock is set while a queue is being initialized. Since we know
