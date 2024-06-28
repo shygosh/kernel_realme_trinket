@@ -801,6 +801,11 @@ config MSM_AVTIMER
 	  Enables camera to use for VT call to get avtimer
 	  timestamp.
 
+config AVTIMER_LEGACY
+	bool "Legacy avtimer"
+	depends on MSM_AVTIMER
+	default y
+
 config MSM_PM
 	depends on PM
 	select MSM_IDLE_STATS if DEBUG_FS
