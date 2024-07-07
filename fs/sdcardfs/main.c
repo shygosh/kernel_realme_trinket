@@ -23,6 +23,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/parser.h>
+#include <linux/init.h>
 
 enum {
 	Opt_fsuid,
@@ -55,6 +56,16 @@ static const match_table_t sdcardfs_tokens = {
 	{Opt_nocache, "nocache"},
 	{Opt_err, NULL}
 };
+
+static bool nosdcardfs = false;
+
+static int __init nosdcardfs_setup(char *s)
+{
+	nosdcardfs = true;
+	return 1;
+}
+
+__setup("nosdcardfs", nosdcardfs_setup);
 
 static int parse_options(struct super_block *sb, char *options, int silent,
 				int *debug, struct sdcardfs_vfsmount_options *vfsopts,
@@ -472,6 +483,11 @@ MODULE_ALIAS_FS(SDCARDFS_NAME);
 static int __init init_sdcardfs_fs(void)
 {
 	int err;
+
+	if (nosdcardfs) {
+		pr_info("sdcardfs: Init aborted!\n");
+		return err;
+	}
 
 	pr_info("Registering sdcardfs " SDCARDFS_VERSION "\n");
 
