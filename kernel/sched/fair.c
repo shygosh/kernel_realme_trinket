@@ -5303,7 +5303,8 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct sched_entity *se = &p->se;
 	int task_new = !(flags & ENQUEUE_WAKEUP);
 	bool prefer_idle = sched_feat(EAS_PREFER_IDLE) ?
-				(schedtune_prefer_idle(p) > 0) : 0;
+			(IS_ENABLED(CONFIG_SCHED_TUNE) ?
+			schedtune_prefer_idle(p) > 0 : uclamp_latency_sensitive(p) > 0) : 0;
 
 #ifdef CONFIG_SCHED_WALT
 	p->misfit = !task_fits_max(p, rq->cpu);
@@ -7410,7 +7411,8 @@ static inline bool task_fits_max(struct task_struct *p, int cpu)
 	if (is_min_capacity_cpu(cpu)) {
 		if (task_boost_policy(p) == SCHED_BOOST_ON_BIG ||
 			task_boost > 0 ||
-			schedtune_task_boost(p) > 0 ||
+			(IS_ENABLED(CONFIG_SCHED_TUNE) ?
+			schedtune_task_boost(p) > 0 : uclamp_boosted(p) > 0) ||
 			walt_should_kick_upmigrate(p, cpu))
 			return false;
 	} else { /* mid cap cpu */
@@ -7499,7 +7501,8 @@ static int get_start_cpu(struct task_struct *p)
 {
 	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
 	int start_cpu = rd->min_cap_orig_cpu;
-	bool boosted = schedtune_task_boost(p) > 0 ||
+	bool boosted = (IS_ENABLED(CONFIG_SCHED_TUNE) ?
+			schedtune_task_boost(p) > 0 : uclamp_boosted(p) > 0) ||
 			task_boost_policy(p) == SCHED_BOOST_ON_BIG;
 	bool task_skip_min = (sched_boost() != CONSERVATIVE_BOOST)
 				&& get_rtg_status(p) && p->unfilter;
@@ -8213,7 +8216,9 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 	int placement_boost = task_boost_policy(p);
 	u64 start_t = 0;
 	int next_cpu = -1, backup_cpu = -1;
-	int boosted = (schedtune_task_boost(p) > 0 || per_task_boost(p) > 0);
+	int boosted = ((IS_ENABLED(CONFIG_SCHED_TUNE) ?
+			schedtune_task_boost(p) > 0 : uclamp_boosted(p) > 0) ||
+			per_task_boost(p) > 0);
 	int start_cpu = get_start_cpu(p);
 
 	if (start_cpu < 0)
@@ -8291,7 +8296,8 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 		 * all if(prefer_idle) blocks.
 		 */
 		prefer_idle = sched_feat(EAS_PREFER_IDLE) ?
-				(schedtune_prefer_idle(p) > 0) : 0;
+				(IS_ENABLED(CONFIG_SCHED_TUNE) ?
+				schedtune_prefer_idle(p) > 0 : uclamp_latency_sensitive(p) > 0) : 0;
 
 		eenv->max_cpu_count = EAS_CPU_BKP + 1;
 
@@ -8405,7 +8411,9 @@ static inline int wake_energy(struct task_struct *p, int prev_cpu,
 		 * Force prefer-idle tasks into the slow path, this may not happen
 		 * if none of the sd flags matched.
 		 */
-		if (schedtune_prefer_idle(p) > 0 && !sync)
+		if ((IS_ENABLED(CONFIG_SCHED_TUNE) ?
+			schedtune_prefer_idle(p) > 0 : uclamp_latency_sensitive(p) > 0) &&
+			!sync)
 			return false;
 	}
 	return true;
