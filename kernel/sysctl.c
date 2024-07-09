@@ -736,21 +736,21 @@ static struct ctl_table kern_table[] = {
 	},
 #ifdef CONFIG_UCLAMP_TASK
 	{
-		.procname	= "sched_util_clamp_min",
+		.procname	= "sched_util_clamp_min_alt",
 		.data		= &sysctl_sched_uclamp_util_min,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= sysctl_sched_uclamp_handler,
 	},
 	{
-		.procname	= "sched_util_clamp_max",
+		.procname	= "sched_util_clamp_max_alt",
 		.data		= &sysctl_sched_uclamp_util_max,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= sysctl_sched_uclamp_handler,
 	},
 	{
-		.procname	= "sched_util_clamp_min_rt_default",
+		.procname	= "sched_util_clamp_min_rt_default_alt",
 		.data		= &sysctl_sched_uclamp_util_min_rt_default,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
