@@ -339,7 +339,7 @@ static inline void qdf_vprint(const char *fmt, va_list args)
 }
 #endif
 
-#ifdef PANIC_ON_BUG
+#if defined(PANIC_ON_BUG) && defined(WLAN_DEBUG)
 #ifdef CONFIG_SLUB_DEBUG
 /**
  * __qdf_bug() - Calls BUG() when the PANIC_ON_BUG compilation option is enabled
