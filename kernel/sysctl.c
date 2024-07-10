@@ -419,7 +419,7 @@ static struct ctl_table kern_table[] = {
 		.extra2		= &sysctl_sched_group_upmigrate_pct,
 	},
 	{
-		.procname	= "sched_boost_alt",
+		.procname	= "sched_boost",
 		.data		= &sysctl_sched_boost,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
