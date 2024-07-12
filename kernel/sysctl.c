@@ -158,6 +158,10 @@ static const int cap_last_cap = CAP_LAST_CAP;
 static unsigned long hung_task_timeout_max = (LONG_MAX/HZ);
 #endif
 
+#if defined(CONFIG_CPU_INPUT_BOOST) || defined(CONFIG_DEVFREQ_BOOST)
+unsigned int sysctl_boost_duration_ms __read_mostly;
+#endif
+
 #ifdef CONFIG_INOTIFY_USER
 #include <linux/inotify.h>
 #endif
@@ -1444,6 +1448,17 @@ static struct ctl_table kern_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0444,
 		.proc_handler	= proc_dointvec,
+	},
+#endif
+#if defined(CONFIG_CPU_INPUT_BOOST) || defined(CONFIG_DEVFREQ_BOOST)
+	{
+		.procname	= "boost_duration_ms",
+		.data		= &sysctl_boost_duration_ms,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_douintvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one_thousand,
 	},
 #endif
 	{ }

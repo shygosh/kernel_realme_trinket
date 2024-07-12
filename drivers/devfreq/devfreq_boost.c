@@ -12,6 +12,8 @@
 #include <linux/slab.h>
 #include <uapi/linux/sched/types.h>
 
+extern unsigned int sysctl_boost_duration_ms __read_mostly;
+
 enum {
 	SCREEN_OFF,
 	INPUT_BOOST,
@@ -58,9 +60,12 @@ static void __devfreq_boost_kick(struct boost_dev *b)
 	if (!READ_ONCE(b->df) || test_bit(SCREEN_OFF, &b->state))
 		return;
 
+	if (!sysctl_boost_duration_ms)
+		return;
+
 	set_bit(INPUT_BOOST, &b->state);
 	if (!mod_delayed_work(system_unbound_wq, &b->input_unboost,
-		msecs_to_jiffies(CONFIG_DEVFREQ_INPUT_BOOST_DURATION_MS))) {
+		msecs_to_jiffies(sysctl_boost_duration_ms))) {
 		/* Set the bit again in case we raced with the unboost worker */
 		set_bit(INPUT_BOOST, &b->state);
 		wake_up(&b->boost_waitq);
@@ -80,6 +85,9 @@ static void __devfreq_boost_kick_max(struct boost_dev *b,
 	unsigned long boost_jiffies, curr_expires, new_expires;
 
 	if (!READ_ONCE(b->df) || test_bit(SCREEN_OFF, &b->state))
+		return;
+
+	if (!duration_ms)
 		return;
 
 	boost_jiffies = msecs_to_jiffies(duration_ms);
@@ -201,8 +209,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 
 		if (*blank == MSM_DRM_BLANK_UNBLANK) {
 			clear_bit(SCREEN_OFF, &b->state);
-			__devfreq_boost_kick_max(b,
-				CONFIG_DEVFREQ_WAKE_BOOST_DURATION_MS);
+			__devfreq_boost_kick_max(b, sysctl_boost_duration_ms);
 		} else {
 			set_bit(SCREEN_OFF, &b->state);
 			wake_up(&b->boost_waitq);
@@ -271,19 +278,6 @@ static const struct input_device_id devfreq_boost_ids[] = {
 		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
 			BIT_MASK(ABS_MT_POSITION_X) |
 			BIT_MASK(ABS_MT_POSITION_Y) }
-	},
-	/* Touchpad */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_KEYBIT |
-			INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.keybit = { [BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH) },
-		.absbit = { [BIT_WORD(ABS_X)] =
-			BIT_MASK(ABS_X) | BIT_MASK(ABS_Y) }
-	},
-	/* Keypad */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-		.evbit = { BIT_MASK(EV_KEY) }
 	},
 	{ }
 };
