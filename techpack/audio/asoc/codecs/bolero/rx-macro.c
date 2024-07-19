@@ -2661,6 +2661,7 @@ static int rx_macro_set_iir_gain(struct snd_soc_dapm_widget *w,
 }
 
 static const struct snd_kcontrol_new rx_macro_snd_controls[] = {
+#ifndef CONFIG_SOUND_CONTROL
 	SOC_SINGLE_S8_TLV("RX_RX0 Digital Volume",
 			  BOLERO_CDC_RX_RX0_RX_VOL_CTL,
 			  -84, 40, digital_gain),
@@ -2679,6 +2680,7 @@ static const struct snd_kcontrol_new rx_macro_snd_controls[] = {
 	SOC_SINGLE_S8_TLV("RX_RX2 Mix Digital Volume",
 			  BOLERO_CDC_RX_RX2_RX_VOL_MIX_CTL,
 			  -84, 40, digital_gain),
+#endif
 
 	SOC_SINGLE_EXT("RX_COMP1 Switch", SND_SOC_NOPM, RX_MACRO_COMP1, 1, 0,
 		rx_macro_get_compander, rx_macro_set_compander),
