@@ -1482,6 +1482,7 @@ static const struct snd_soc_dapm_route tx_audio_map[] = {
 };
 
 static const struct snd_kcontrol_new tx_macro_snd_controls[] = {
+#ifndef CONFIG_SOUND_CONTROL
 	SOC_SINGLE_S8_TLV("TX_DEC0 Volume",
 			  BOLERO_CDC_TX0_TX_VOL_CTL,
 			  -84, 40, digital_gain),
@@ -1506,6 +1507,7 @@ static const struct snd_kcontrol_new tx_macro_snd_controls[] = {
 	SOC_SINGLE_S8_TLV("TX_DEC7 Volume",
 			  BOLERO_CDC_TX7_TX_VOL_CTL,
 			  -84, 40, digital_gain),
+#endif
 
 	SOC_ENUM("TX0 HPF cut off", cf_dec0_enum),
 

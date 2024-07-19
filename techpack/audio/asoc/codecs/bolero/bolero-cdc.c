@@ -759,14 +759,16 @@ static ssize_t headphone_gain_store(struct kobject *kobj,
 
 	sscanf(buf, "%d %d", &input_l, &input_r);
 
-	if (input_l < -40 || input_l > 20)
+	if (input_l < -20 || input_l > 20)
 		input_l = 0;
 
-	if (input_r < -40 || input_r > 20)
+	if (input_r < -20 || input_r > 20)
 		input_r = 0;
 
 	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_RX_RX0_RX_VOL_CTL, input_l);
 	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_RX_RX1_RX_VOL_CTL, input_r);
+	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_RX_RX0_RX_VOL_MIX_CTL, input_l);
+	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_RX_RX1_RX_VOL_MIX_CTL, input_r);
 
 	return count;
 }
@@ -780,7 +782,7 @@ static ssize_t mic_gain_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
 	return snprintf(buf, PAGE_SIZE, "%d\n",
-		snd_soc_read(sound_control_codec_ptr, BOLERO_CDC_TX1_TX_VOL_CTL));
+		snd_soc_read(sound_control_codec_ptr, BOLERO_CDC_TX0_TX_VOL_CTL));
 }
 
 static ssize_t mic_gain_store(struct kobject *kobj,
@@ -788,9 +790,16 @@ static ssize_t mic_gain_store(struct kobject *kobj,
 {
 	int input;
 	sscanf(buf, "%d", &input);
-	if (input < -10 || input > 20)
+	if (input < -20 || input > 20)
 		input = 0;
+	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_TX0_TX_VOL_CTL, input);
 	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_TX1_TX_VOL_CTL, input);
+	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_TX2_TX_VOL_CTL, input);
+	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_TX3_TX_VOL_CTL, input);
+	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_TX4_TX_VOL_CTL, input);
+	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_TX5_TX_VOL_CTL, input);
+	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_TX6_TX_VOL_CTL, input);
+	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_TX7_TX_VOL_CTL, input);
 	return count;
 }
 
@@ -811,9 +820,10 @@ static ssize_t speaker_gain_store(struct kobject *kobj,
 {
 	int input;
 	sscanf(buf, "%d", &input);
-	if (input < -10 || input > 20)
+	if (input < -20 || input > 20)
 		input = 0;
 	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_RX_RX2_RX_VOL_CTL, input);
+	snd_soc_write(sound_control_codec_ptr, BOLERO_CDC_RX_RX2_RX_VOL_MIX_CTL, input);
 	return count;
 }
 
