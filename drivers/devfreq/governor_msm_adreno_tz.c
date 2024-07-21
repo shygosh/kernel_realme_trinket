@@ -59,6 +59,7 @@ static DEFINE_SPINLOCK(tz_lock);
 static atomic_long_t suspend_time;
 static atomic_long_t suspend_start;
 static atomic_long_t acc_total, acc_relative_busy;
+static int adrenoboost __read_mostly;
 
 /*
  * Returns GPU suspend time in millisecond.
@@ -121,15 +122,45 @@ static ssize_t suspend_time_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%llu\n", time_diff);
 }
 
+static ssize_t adrenoboost_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	size_t count = 0;
+
+	count += sprintf(buf, "%d\n", adrenoboost);
+
+	return count;
+}
+
+static ssize_t adrenoboost_save(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int input;
+
+	sscanf(buf, "%d ", &input);
+	if (input < 0)
+		adrenoboost = 0;
+	else if (input > 3)
+		adrenoboost = 3;
+	else
+		adrenoboost = input;
+
+	return count;
+}
+
 static DEVICE_ATTR(gpu_load, 0444, gpu_load_show, NULL);
 
 static DEVICE_ATTR(suspend_time, 0444,
 		suspend_time_show,
 		NULL);
 
+static DEVICE_ATTR(adrenoboost, 0644,
+		adrenoboost_show, adrenoboost_save);
+
 static const struct device_attribute *adreno_tz_attr_list[] = {
 		&dev_attr_gpu_load,
 		&dev_attr_suspend_time,
+		&dev_attr_adrenoboost,
 		NULL
 };
 
@@ -345,7 +376,12 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 
 	*freq = stats.current_frequency;
 	priv->bin.total_time += stats.total_time;
-	priv->bin.busy_time += stats.busy_time;
+
+	// Scale up busy_time based on adrenoboost, only if it exceeds MIN_BUSY.
+	if ((s64)(priv->bin.busy_time + stats.busy_time) >= MIN_BUSY)
+		priv->bin.busy_time += stats.busy_time * (adrenoboost + 1);
+	else
+		priv->bin.busy_time += stats.busy_time;
 
 	if (stats.private_data)
 		context_count =  *((int *)stats.private_data);
