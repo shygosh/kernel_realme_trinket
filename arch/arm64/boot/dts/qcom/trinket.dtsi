@@ -389,7 +389,7 @@
 	};
 
 	chosen {
-		bootargs = "rcupdate.rcu_expedited=1 quiet noirqdebug nodebugmon mitigations=off";
+		bootargs = "rcupdate.rcu_expedited=1 quiet noirqdebug nodebugmon mitigations=off cgroup_disable=pressure";
 	};
 
 	soc: soc { };
