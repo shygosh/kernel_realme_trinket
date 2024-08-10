@@ -2875,6 +2875,12 @@ static void lru_gen_age_node(struct pglist_data *pgdat, struct scan_control *sc)
 		cond_resched();
 	} while ((memcg = mem_cgroup_iter(NULL, memcg, NULL)));
 
+	// Skip OOM, trigger PSI instead.
+	if (!success) {
+		psi_emergency_trigger();
+		return;
+	}
+
 	/*
 	 * The main goal is to OOM kill if every generation from all memcgs is
 	 * younger than min_ttl. However, another theoretical possibility is all
