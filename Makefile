@@ -736,7 +736,7 @@ else
 KBUILD_CFLAGS   += -O3
 endif
 
-ARCH_FLAGS	:= -mcpu=cortex-a53
+ARCH_FLAGS	:= -mcpu=cortex-a53+crypto+crc+aes+fp+sha2+simd
 KBUILD_CFLAGS	+= $(ARCH_FLAGS)
 KBUILD_AFLAGS	+= $(ARCH_FLAGS)
 LDFLAGS      	+= $(ARCH_FLAGS)
