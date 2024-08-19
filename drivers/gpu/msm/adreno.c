@@ -1015,6 +1015,8 @@ static int adreno_of_get_power(struct adreno_device *adreno_dev,
 	if (of_property_read_u32(node, "qcom,idle-timeout", &timeout))
 		timeout = 80;
 
+	timeout = 500;
+
 	device->pwrctrl.interval_timeout = msecs_to_jiffies(timeout);
 
 	device->pwrctrl.bus_control = of_property_read_bool(node,
