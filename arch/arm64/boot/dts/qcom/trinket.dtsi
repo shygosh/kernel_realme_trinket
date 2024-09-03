@@ -389,13 +389,14 @@
 	};
 
 	chosen {
-		bootargs = "rcupdate.rcu_expedited=1 quiet noirqdebug nodebugmon mitigations=off cgroup_disable=pressure";
+		bootargs = "rcupdate.rcu_expedited=1 quiet noirqdebug nodebugmon mitigations=off cgroup_disable=pressure androidboot.boot_devices=soc/4744000.sdhci";
 	};
 
 	soc: soc { };
 
 	firmware: firmware {
 		android {
+			boot_devices = "soc/4744000.sdhci";
 			compatible = "android,firmware";
 			vbmeta {
 				compatible = "android,vbmeta";
