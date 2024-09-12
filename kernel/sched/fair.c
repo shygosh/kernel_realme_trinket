@@ -6465,28 +6465,6 @@ schedtune_task_margin(struct task_struct *task)
 
 #endif /* CONFIG_SCHED_TUNE */
 
-unsigned long
-boosted_cpu_util(int cpu, struct sched_walt_cpu_load *walt_load)
-{
-	unsigned long util = cpu_util_freq(cpu, walt_load);
-	long margin = schedtune_cpu_margin(util, cpu);
-
-	trace_sched_boost_cpu(cpu, util, margin);
-
-	return util + margin;
-}
-
-static inline unsigned long
-boosted_task_util(struct task_struct *task)
-{
-	unsigned long util = task_util_est(task);
-	long margin = schedtune_task_margin(task);
-
-	trace_sched_boost_task(task, util, margin);
-
-	return util + margin;
-}
-
 static unsigned long cpu_util_without(int cpu, struct task_struct *p);
 
 static unsigned long capacity_spare_without(int cpu, struct task_struct *p)
@@ -6992,7 +6970,7 @@ static inline int select_idle_sibling_cstate_aware(struct task_struct *p, int pr
 					continue;
 
 				/* figure out if the task can fit here at all */
-				new_usage = boosted_task_util(p);
+				new_usage = task_util_est(p);
 				capacity_orig = capacity_orig_of(i);
 
 				if (new_usage > capacity_orig)
@@ -7047,7 +7025,7 @@ static inline bool task_fits_capacity(struct task_struct *p,
 	else
 		margin = sched_capacity_margin_up[task_cpu(p)];
 
-	return capacity * 1024 > boosted_task_util(p) * margin;
+	return capacity * 1024 > task_util_est(p) * margin;
 }
 
 static inline bool task_fits_max(struct task_struct *p, int cpu)
@@ -7157,7 +7135,7 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 				   bool boosted, bool prefer_idle,
 				   struct find_best_target_env *fbt_env)
 {
-	unsigned long min_util = boosted_task_util(p);
+	unsigned long min_util = task_util_est(p);
 	unsigned long target_capacity = ULONG_MAX;
 	unsigned long min_wake_util = ULONG_MAX;
 	unsigned long target_max_spare_cap = 0;
@@ -7796,7 +7774,7 @@ static inline struct energy_env *get_eenv(struct task_struct *p, int prev_cpu)
 	 * util for group utilization calculations
 	 */
 	eenv->util_delta = task_util_est(p);
-	eenv->util_delta_boosted = boosted_task_util(p);
+	eenv->util_delta_boosted = task_util_est(p);
 
 	cpumask_and(&cpumask_possible_cpus, p->cpus_ptr, cpu_online_mask);
 	eenv->max_cpu_count = cpumask_weight(&cpumask_possible_cpus);
