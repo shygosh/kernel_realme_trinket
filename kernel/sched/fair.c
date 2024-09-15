@@ -9117,8 +9117,10 @@ static int detach_tasks(struct lb_env *env)
 		env->flags |= LBF_IGNORE_PREFERRED_CLUSTER_TASKS;
 #endif
 
+#if 0
 	if (cpu_capacity(env->dst_cpu) < cpu_capacity(env->src_cpu))
 		env->flags |= LBF_IGNORE_BIG_TASKS;
+#endif
 
 redo:
 	while (!list_empty(tasks)) {
