@@ -8958,16 +8958,15 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 
 	/*
 	 * Aggressive migration if:
-	 * 1) IDLE or NEWLY_IDLE balance.
-	 * 2) destination numa is preferred
-	 * 3) task is cache cold, or
-	 * 4) too many balance attempts have failed.
+	 * 1) destination numa is preferred
+	 * 2) task is cache cold, or
+	 * 3) too many balance attempts have failed.
 	 */
 	tsk_cache_hot = migrate_degrades_locality(p, env);
 	if (tsk_cache_hot == -1)
 		tsk_cache_hot = task_hot(p, env);
 
-	if (env->idle != CPU_NOT_IDLE || tsk_cache_hot <= 0 ||
+	if (tsk_cache_hot <= 0 ||
 	    env->sd->nr_balance_failed > env->sd->cache_nice_tries) {
 		if (tsk_cache_hot == 1) {
 			schedstat_inc(env->sd->lb_hot_gained[env->idle]);
@@ -10571,7 +10570,6 @@ static struct rq *find_busiest_queue(struct lb_env *env,
  * so long as it is large enough.
  */
 #define MAX_PINNED_INTERVAL	512
-#define NEED_ACTIVE_BALANCE_THRESHOLD 10
 
 static int need_active_balance(struct lb_env *env)
 {
@@ -10930,12 +10928,10 @@ no_move:
 				stop_one_cpu_nowait(cpu_of(busiest),
 					active_load_balance_cpu_stop, busiest,
 					&busiest->active_balance_work);
-				*continue_balancing = 0;
 			}
 
 			/* We've kicked active balancing, force task migration. */
-			sd->nr_balance_failed = sd->cache_nice_tries +
-					NEED_ACTIVE_BALANCE_THRESHOLD - 1;
+			sd->nr_balance_failed = sd->cache_nice_tries+1;
 		}
 	} else
 		sd->nr_balance_failed = 0;
