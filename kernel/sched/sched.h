@@ -2102,11 +2102,7 @@ static inline unsigned long cpu_util_cum(int cpu, int delta)
 	unsigned long capacity = capacity_orig_of(cpu);
 	u64 util;
 
-#ifdef CONFIG_SCHED_WALT
 	util = cpu_util(cpu);
-#else
-	util = __cpu_util(cpu);
-#endif
 
 	delta += util;
 	if (delta < 0)
