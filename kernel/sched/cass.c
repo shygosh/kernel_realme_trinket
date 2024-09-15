@@ -88,21 +88,12 @@ bool cass_cpu_better(const struct cass_cpu_cand *a,
 	if (sync && (cass_eq(a->cpu, this_cpu) || !cass_cmp(b->cpu, this_cpu)))
 		goto done;
 
-	/* Prefer the CPU with higher capacity */
-	if (cass_cmp(a->cap, b->cap))
-		goto done;
-
 	/* Prefer the CPU with lower idle exit latency */
 	if (cass_cmp(b->exit_lat, a->exit_lat))
 		goto done;
 
 	/* Prefer the previous CPU */
 	if (cass_eq(a->cpu, prev_cpu) || !cass_cmp(b->cpu, prev_cpu))
-		goto done;
-
-	/* Prefer the CPU that shares a cache with the previous CPU */
-	if (cass_cmp(cpus_share_cache(a->cpu, prev_cpu),
-		     cpus_share_cache(b->cpu, prev_cpu)))
 		goto done;
 
 	/* @a isn't a better CPU than @b. @res must be <=0 to indicate such. */
@@ -119,6 +110,9 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	bool has_idle = false;
 	unsigned long p_util = rt ? 0 : task_util_est(p);
 	int cidx = 0, cpu;
+	int adj = p->signal->oom_score_adj;
+	const struct cpumask *valid_mask =
+		(adj > -1 && adj < 225) ? cpu_perf_mask : cpu_lp_mask;
 
 	/*
 	 * Find the best CPU to wake @p on. Although idle_get_state() requires
@@ -131,7 +125,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	 * otherwise, if only one CPU is allowed and it is skipped before
 	 * @curr->cpu is set, then @best->cpu will be garbage.
 	 */
-	for_each_cpu_and(cpu, p->cpus_ptr, cpu_active_mask) {
+	for_each_cpu_and(cpu, valid_mask, cpu_active_mask) {
 		/* Use the free candidate slot for @curr */
 		struct cass_cpu_cand *curr = &cands[cidx];
 		struct cpuidle_state *idle_state;
