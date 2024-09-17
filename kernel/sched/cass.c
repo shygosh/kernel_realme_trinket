@@ -27,7 +27,6 @@
 
 struct cass_cpu_cand {
 	int cpu;
-	unsigned int exit_lat;
 	unsigned long cap;
 	unsigned long util;
 };
@@ -88,10 +87,6 @@ bool cass_cpu_better(const struct cass_cpu_cand *a,
 	if (sync && (cass_eq(a->cpu, this_cpu) || !cass_cmp(b->cpu, this_cpu)))
 		goto done;
 
-	/* Prefer the CPU with lower idle exit latency */
-	if (cass_cmp(b->exit_lat, a->exit_lat))
-		goto done;
-
 	/* Prefer the previous CPU */
 	if (cass_eq(a->cpu, prev_cpu) || !cass_cmp(b->cpu, prev_cpu))
 		goto done;
@@ -107,7 +102,6 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	/* Initialize @best such that @best always has a valid CPU at the end */
 	struct cass_cpu_cand cands[2], *best = cands;
 	int this_cpu = raw_smp_processor_id();
-	bool has_idle = false;
 	unsigned long p_util = rt ? 0 : task_util_est(p);
 	int cidx = 0, cpu;
 	struct cpumask *valid_mask = this_cpu_cpumask_var_ptr(select_idle_mask);
@@ -123,11 +117,17 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 		cpumask_copy(valid_mask, p->cpus_ptr);
 
 	/*
-	 * Find the best CPU to wake @p on. Although idle_get_state() requires
-	 * an RCU read lock, an RCU read lock isn't needed because we're not
-	 * preemptible and RCU-sched is unified with normal RCU. Therefore,
-	 * non-preemptible contexts are implicitly RCU-safe.
-	 *
+	 * Check if this CPU is idle or only has SCHED_IDLE tasks. For
+	 * sync wakes, always treat the current CPU as idle.
+	 */
+	for_each_cpu_and(cpu, valid_mask, cpu_active_mask) {
+		struct rq *rq = cpu_rq(cpu);
+		if ((sync && cpu == this_cpu && rq->nr_running == 1) ||
+		    (idle_cpu(cpu) && !cpu_isolated(cpu)))
+			return cpu;
+	}
+
+	/*
 	 * Note: @curr->cpu must be initialized before this loop ends. This is
 	 * necessary to ensure @best->cpu contains a valid CPU upon returning;
 	 * otherwise, if only one CPU is allowed and it is skipped before
@@ -136,35 +136,6 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	for_each_cpu_and(cpu, valid_mask, cpu_active_mask) {
 		/* Use the free candidate slot for @curr */
 		struct cass_cpu_cand *curr = &cands[cidx];
-		struct cpuidle_state *idle_state;
-		struct rq *rq = cpu_rq(cpu);
-
-		/*
-		 * Check if this CPU is idle or only has SCHED_IDLE tasks. For
-		 * sync wakes, always treat the current CPU as idle.
-		 */
-		if ((sync && cpu == this_cpu && rq->nr_running == 1) || 
-			(idle_cpu(cpu) && !cpu_isolated(cpu))) {
-			/* Discard any previous non-idle candidate */
-			if (!has_idle)
-				best = curr;
-			has_idle = true;
-
-			/* Nonzero exit latency indicates this CPU is idle */
-			curr->exit_lat = 1;
-
-			/* Add on the actual idle exit latency, if any */
-			idle_state = idle_get_state(cpu_rq(cpu));
-			if (idle_state)
-				curr->exit_lat += idle_state->exit_latency;
-		} else {
-			/* Skip non-idle CPUs if there's an idle candidate */
-			if (has_idle)
-				continue;
-
-			/* Zero exit latency indicates this CPU isn't idle */
-			curr->exit_lat = 0;
-		}
 
 		/* Get this CPU's capacity and utilization */
 		curr->cpu = cpu;
