@@ -2084,6 +2084,12 @@ static inline unsigned long cpu_util(int cpu)
 	return min_t(unsigned long, util, capacity_orig_of(cpu));
 }
 
+static inline unsigned long capacity_margin_of(int cpu)
+{
+#define CAP_LIMIT_PERCENT 90
+	return 100 * capacity_orig_of(cpu) / CAP_LIMIT_PERCENT;
+}
+
 struct sched_walt_cpu_load {
 	unsigned long prev_window_util;
 	unsigned long nl;
@@ -2178,7 +2184,7 @@ extern unsigned int capacity_margin_freq;
 static inline unsigned long
 add_capacity_margin(unsigned long cpu_capacity, int cpu)
 {
-	cpu_capacity  = cpu_capacity * capacity_margin_freq *
+	cpu_capacity  = cpu_capacity * capacity_margin_of(cpu) *
 			(100 + per_cpu(sched_load_boost, cpu));
 	cpu_capacity /= 100;
 	cpu_capacity /= SCHED_CAPACITY_SCALE;
