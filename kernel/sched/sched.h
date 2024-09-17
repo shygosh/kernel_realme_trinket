@@ -2090,6 +2090,21 @@ static inline unsigned long cpu_util(int cpu)
 	return min_t(unsigned long, util, capacity_orig_of(cpu));
 }
 
+static unsigned long capacity_margin_of(int cpu)
+{
+	struct rq *rq = cpu_rq(cpu);
+	unsigned long capacity = rq->cpu_capacity_orig;
+	unsigned long margin_rt, margin_sqrt, i;
+
+	margin_rt = cpu_util_rt(rq) + cpu_util_dl(rq) + cpu_util_irq(rq);
+	margin_sqrt = int_sqrt(margin_rt) + 1;
+
+	for (i = 1; i <= margin_sqrt; i++)
+		capacity += i << 1;
+
+	return capacity + margin_rt;
+}
+
 struct sched_walt_cpu_load {
 	unsigned long prev_window_util;
 	unsigned long nl;
@@ -2188,7 +2203,7 @@ extern unsigned int capacity_margin_freq;
 static inline unsigned long
 add_capacity_margin(unsigned long cpu_capacity, int cpu)
 {
-	cpu_capacity  = cpu_capacity * capacity_margin_freq *
+	cpu_capacity  = cpu_capacity * capacity_margin_of(cpu) *
 			(100 + per_cpu(sched_load_boost, cpu));
 	cpu_capacity /= 100;
 	cpu_capacity /= SCHED_CAPACITY_SCALE;
