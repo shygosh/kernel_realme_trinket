@@ -5113,6 +5113,9 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 	int dest_cpu;
 	cpumask_t allowed_mask;
 
+	// Don't allow setting CPU affinity.
+	return 0;
+
 	rcu_read_lock();
 
 	p = find_process_by_pid(pid);
