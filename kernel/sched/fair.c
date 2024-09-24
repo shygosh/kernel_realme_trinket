@@ -4241,12 +4241,17 @@ pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 	 * be done without getting too unfair.
 	 */
 	if (cfs_rq->skip == se) {
+		unsigned int i = 1, nr_tries = cfs_rq->h_nr_running;
 		struct sched_entity *second;
 
 		if (se == curr) {
 			second = __pick_first_entity(cfs_rq);
+			for (i = 1; second == cfs_rq->skip && i < nr_tries; i++)
+				second = __pick_first_entity(cfs_rq);
 		} else {
 			second = __pick_next_entity(se);
+			for (i = 1; second == cfs_rq->skip && i < nr_tries; i++)
+				second = __pick_next_entity(se);
 			if (!second || (curr && entity_before(curr, second)))
 				second = curr;
 		}
