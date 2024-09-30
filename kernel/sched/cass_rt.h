@@ -12,5 +12,12 @@ static inline void *select_task_rq_rt_dummy(void)
 {
 	return (void *)select_task_rq_rt;
 }
+
+/* Use CASS. A dummy wrapper ensures the replaced function is still "used". */
+static inline void *select_task_rq_dl_dummy(void)
+{
+	return (void *)select_task_rq_dl;
+}
 #define select_task_rq_rt cass_select_task_rq_rt
+#define select_task_rq_dl cass_select_task_rq_rt
 #endif /* CONFIG_SCHED_CASS */

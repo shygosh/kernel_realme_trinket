@@ -2361,6 +2361,7 @@ static void prio_changed_dl(struct rq *rq, struct task_struct *p,
 	}
 }
 
+#include "cass_rt.h"
 const struct sched_class dl_sched_class = {
 	.next			= &rt_sched_class,
 	.enqueue_task		= enqueue_task_dl,
