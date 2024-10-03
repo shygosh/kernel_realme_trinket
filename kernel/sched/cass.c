@@ -115,6 +115,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	bool has_idle = false;
 	unsigned long p_util = rt ? 0 : task_util_est(p);
 	int cidx = 0, cpu;
+	bool perf = p->signal->oom_score_adj == 0;
 
 	/*
 	 * Find the best CPU to wake @p on. Although idle_get_state() requires
@@ -127,7 +128,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	 * otherwise, if only one CPU is allowed and it is skipped before
 	 * @curr->cpu is set, then @best->cpu will be garbage.
 	 */
-	for_each_cpu_and(cpu, p->cpus_ptr, cpu_active_mask) {
+	for_each_cpu_and(cpu, (perf ? cpu_perf_mask : cpu_lp_mask), cpu_active_mask) {
 		/* Use the free candidate slot for @curr */
 		struct cass_cpu_cand *curr = &cands[cidx];
 		struct cpuidle_state *idle_state;
