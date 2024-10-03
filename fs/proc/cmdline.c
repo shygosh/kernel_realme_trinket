@@ -68,6 +68,9 @@ static int __init proc_cmdline_init(void)
 	if (super_partition)
 		patch_sar_flags(new_command_line);
 
+	patch_flag_remove_flag(new_command_line, "rcu_nocbs=");
+	patch_flag_add_flag(new_command_line, "rcu_nocbs=4-7");
+
 	proc_create("cmdline", 0, NULL, &cmdline_proc_fops);
 	return 0;
 }
