@@ -480,6 +480,7 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 #endif
+#ifdef CONFIG_CGROUP_SCHED
 	{
 		.procname	= "sched_upmigrate_alt",
 		.data		= &sysctl_sched_capacity_margin_up,
@@ -494,6 +495,7 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= sched_updown_migrate_handler,
 	},
+#endif
 #ifdef CONFIG_SCHED_DEBUG
 	{
 		.procname	= "sched_min_granularity_ns_alt",
