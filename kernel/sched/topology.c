@@ -1345,7 +1345,7 @@ sd_init(struct sched_domain_topology_level *tl,
 
 	} else if (sd->flags & SD_SHARE_PKG_RESOURCES) {
 		sd->flags |= SD_LOAD_BALANCE;
-		sd->imbalance_pct = 117;
+		sd->imbalance_pct = 125;
 		sd->cache_nice_tries = 1;
 
 #ifdef CONFIG_NUMA
