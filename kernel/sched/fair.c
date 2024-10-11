@@ -7650,6 +7650,43 @@ bool cpu_overutilized(int cpu)
 	return __cpu_overutilized(cpu, 0);
 }
 
+static bool cpu_underutilized(int this_cpu, struct cpumask *cpus_mask,
+			      struct sched_domain *sd)
+{
+	unsigned long this_util, iter_util, most_util, least_util;
+	int cpu, imbalance_pct;
+
+	least_util = SCHED_CAPACITY_SCALE;
+	imbalance_pct = !sd ? 125 : sd->imbalance_pct;
+	this_util = cpu_util(this_cpu) * SCHED_CAPACITY_SCALE /
+			 capacity_orig_of(this_cpu);
+
+	for_each_cpu(cpu, cpus_mask) {
+		if (cpu == this_cpu)
+			continue;
+		if (cpu_isolated(cpu))
+			continue;
+
+		iter_util = cpu_util(cpu) * SCHED_CAPACITY_SCALE /
+				 capacity_orig_of(cpu);
+
+		if (iter_util < least_util)
+			least_util = iter_util;
+		if (iter_util > most_util)
+			most_util = iter_util;
+	}
+
+	/*
+	 * this_cpu is considered underutilized if it has the
+	 * least CFS utilization among cpus in a group.
+	 */
+	if (this_util <= least_util &&
+	    this_util * imbalance_pct < most_util * 100)
+		return true;
+
+	return false;
+}
+
 DEFINE_PER_CPU(struct energy_env, eenv_cache);
 
 /* kernels often have NR_CPUS defined to be much
@@ -10558,8 +10595,15 @@ static int should_we_balance(struct lb_env *env)
 		break;
 	}
 
-	if (balance_cpu == -1)
-		balance_cpu = group_balance_cpu_not_isolated(sg);
+	/* This cpu isn't idle but is it the least utilized? */
+	if (balance_cpu == -1 && !cpu_isolated(env->dst_cpu)) {
+		struct cpumask *lb_mask = this_cpu_cpumask_var_ptr(load_balance_mask);
+		cpumask_and(lb_mask, group_balance_mask(sg), env->cpus);
+		if (cpu_underutilized(env->dst_cpu, lb_mask, env->sd))
+			return 1;
+		else
+			return 0;
+	}
 
 	/*
 	 * First idle cpu or the first cpu(busiest) in this sched group
