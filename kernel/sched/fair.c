@@ -8720,6 +8720,7 @@ struct lb_env {
 	int			src_cpu;
 
 	int			dst_cpu;
+	int			skip_cpu;
 	struct rq		*dst_rq;
 
 	struct cpumask		*dst_grpmask;
@@ -8750,8 +8751,9 @@ static int task_hot(struct task_struct *p, struct lb_env *env)
 
 	lockdep_assert_held(&env->src_rq->lock);
 
+	/* Don't migrate non-CFS tasks */
 	if (p->sched_class != &fair_sched_class)
-		return 0;
+		return 1;
 
 	if (unlikely(p->policy == SCHED_IDLE))
 		return 0;
@@ -10374,6 +10376,9 @@ static struct rq *find_busiest_queue(struct lb_env *env,
 		unsigned long capacity, load;
 		enum fbq_type rt;
 
+		if (env->skip_cpu >= 0 && env->skip_cpu == i)
+			continue;
+
 		rq = cpu_rq(i);
 		rt = fbq_classify_rq(rq);
 
@@ -10520,6 +10525,39 @@ static int group_balance_cpu_not_isolated(struct sched_group *sg)
 
 static int active_load_balance_cpu_stop(void *data);
 
+static bool should_cpu_balance(struct lb_env *env)
+{
+	struct cpumask *lb_mask = this_cpu_cpumask_var_ptr(load_balance_mask);
+	unsigned long cur_load, tmp_load, max_load, min_load;
+	int cpu;
+
+	min_load = SCHED_CAPACITY_SCALE;
+	cur_load = cfs_rq_load_avg(&cpu_rq(env->dst_cpu)->cfs) *
+		 SCHED_CAPACITY_SCALE / capacity_orig_of(env->dst_cpu);
+
+	cpumask_and(lb_mask, group_balance_mask(env->sd->groups), env->cpus);
+	for_each_cpu(cpu, lb_mask) {
+		if (cpu == env->dst_cpu)
+			continue;
+		if (env->skip_cpu >= 0 && env->skip_cpu == cpu)
+			continue;
+		if (cpu_isolated(cpu))
+			continue;
+		tmp_load = cfs_rq_load_avg(&cpu_rq(cpu)->cfs) *
+			 SCHED_CAPACITY_SCALE / capacity_orig_of(cpu);
+		if (tmp_load < min_load)
+			min_load = tmp_load;
+		if (tmp_load > max_load)
+			max_load = tmp_load;
+	}
+
+	if (cur_load <= min_load &&
+	    cur_load * env->sd->imbalance_pct < max_load * 100)
+		return true;
+
+	return false;
+}
+
 static int should_we_balance(struct lb_env *env)
 {
 	struct sched_group *sg = env->sd->groups;
@@ -10559,6 +10597,12 @@ static int should_we_balance(struct lb_env *env)
 		return cpu == env->dst_cpu;
 	}
 
+	 /* dst_cpu isn't idle but is it underutilized? */
+	if (!cpu_isolated(env->dst_cpu) && should_cpu_balance(env))
+		return 1;
+	else
+		return 0;
+
 	/* Are we the first CPU of this group ? */
 	return group_balance_cpu_not_isolated(sg) == env->dst_cpu;
 }
@@ -10591,7 +10635,9 @@ static int load_balance(int this_cpu, struct rq *this_rq,
 		.imbalance		= 0,
 		.flags			= 0,
 		.loop			= 0,
+		.skip_cpu		= -1,
 	};
+	int src_cfs_nr_running, dst_cfs_nr_running;
 
 	cpumask_and(cpus, sched_domain_span(sd), cpu_active_mask);
 
@@ -10613,6 +10659,16 @@ redo:
 	if (!busiest) {
 		schedstat_inc(sd->lb_nobusyq[idle]);
 		goto out_balanced;
+	}
+
+	dst_cfs_nr_running = cpu_rq(this_cpu)->cfs.h_nr_running;
+	src_cfs_nr_running = cpu_rq(busiest->cpu)->cfs.h_nr_running;
+
+	/* Redo if there is not enough tasks */
+	if (src_cfs_nr_running - (int)sysctl_sched_nr_migrate <
+	    dst_cfs_nr_running) {
+		env.skip_cpu = busiest->cpu;
+		goto redo;
 	}
 
 	BUG_ON(busiest == env.dst_rq);
