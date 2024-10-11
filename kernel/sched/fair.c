@@ -7650,6 +7650,39 @@ bool cpu_overutilized(int cpu)
 	return __cpu_overutilized(cpu, 0);
 }
 
+/*
+ * Check if cpu is the least utilized (CFS) among cpus in a group.
+ */
+static bool cpu_underutilized(int this_cpu, struct cpumask *cpus_mask,
+			      struct sched_domain *sd)
+{
+	unsigned long least_util = SCHED_CAPACITY_SCALE;
+	unsigned long this_util = cpu_util(this_cpu) *
+		  SCHED_CAPACITY_SCALE / capacity_orig_of(this_cpu);
+	unsigned long iter_util, most_util;
+	int cpu, threshold = 125;
+
+	if (sd)
+		threshold = sd->imbalance_pct;
+
+	for_each_cpu(cpu, cpus_mask) {
+		if (cpu == this_cpu || cpu_isolated(cpu))
+			continue;
+		iter_util = cpu_util(cpu) * SCHED_CAPACITY_SCALE /
+				 capacity_orig_of(cpu);
+		if (iter_util < least_util)
+			least_util = iter_util;
+		if (iter_util > most_util)
+			most_util = iter_util;
+	}
+
+	if (this_util <= least_util &&
+	    this_util * threshold < most_util * 100)
+		return true;
+
+	return false;
+}
+
 DEFINE_PER_CPU(struct energy_env, eenv_cache);
 
 /* kernels often have NR_CPUS defined to be much
@@ -10557,6 +10590,20 @@ static int should_we_balance(struct lb_env *env)
 		/* Are we the first idle CPU? */
 		return cpu == env->dst_cpu;
 	}
+
+#if defined(CONFIG_SMP) && (NR_CPUS <= 16)
+	/* dst_cpu isn't idle but is it the least utilized? */
+	if (!cpu_isolated(env->dst_cpu)) {
+		struct cpumask *lb_mask = this_cpu_cpumask_var_ptr(load_balance_mask);
+
+		cpumask_and(lb_mask, group_balance_mask(sg), env->cpus);
+		if (cpu_underutilized(env->dst_cpu, lb_mask, env->sd))
+			return 1;
+
+		/* dst_cpu isn't underutilized either so bail out */
+		return 0;
+	}
+#endif
 
 	/* Are we the first CPU of this group ? */
 	return group_balance_cpu(sg) == env->dst_cpu;
