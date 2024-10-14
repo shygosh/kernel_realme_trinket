@@ -46,6 +46,13 @@ static void patch_flag_remove_flag(char *cmd, const char *flag)
 	}
 }
 
+static void patch_flag_add_flag(char *cmd, const char *flag)
+{
+	const char *wspace = " ";
+	strcat(cmd, wspace);
+	strcat(cmd, flag);
+}
+
 static void patch_sar_flags(char *cmd)
 {
 	patch_flag_remove_flag(cmd, "root=PARTUUID=");
