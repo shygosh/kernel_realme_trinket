@@ -4334,6 +4334,9 @@ int idle_cpu(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
 
+	if (unlikely(!rq->cfs.h_nr_running))
+		return 1;
+
 	if (rq->curr != rq->idle)
 		return 0;
 
