@@ -8788,7 +8788,7 @@ static int task_hot(struct task_struct *p, struct lb_env *env)
 	lockdep_assert_held(&env->src_rq->lock);
 
 	if (p->sched_class != &fair_sched_class)
-		return 0;
+		return 1;
 
 	if (unlikely(p->policy == SCHED_IDLE))
 		return 0;
