@@ -41,10 +41,9 @@
  * the heaviest and least-heavy CPUs during the last polling window in order for
  * balancing to occur. This is to avoid balancing when the system is quiet.
  *
- * This threshold is compared to the _scaled_ interrupt counts per CPU; i.e.,
- * the number of interrupts scaled to the CPU's capacity.
+ * This threshold is percentage of the _scaled_ interrupt counts per CPU.
  */
-#define IRQ_SCALED_THRESH CONFIG_IRQ_SBALANCE_THRESH
+#define IRQ_PCT_THRESH CONFIG_IRQ_SBALANCE_THRESH
 
 struct bal_irq {
 	struct list_head node;
@@ -205,7 +204,7 @@ static bool find_min_bd(const cpumask_t *mask, unsigned int max_intrs,
 		return true;
 
 	/* Don't balance if IRQs are already balanced evenly enough */
-	return max_intrs - min_intrs < IRQ_SCALED_THRESH;
+	return max_intrs * 100 < min_intrs * IRQ_PCT_THRESH;
 }
 
 static void balance_irqs(void)

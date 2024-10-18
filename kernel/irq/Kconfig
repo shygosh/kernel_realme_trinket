@@ -169,16 +169,16 @@ config IRQ_SBALANCE_POLL_MSEC
 	  Perform IRQ balancing every X milliseconds.
 
 config IRQ_SBALANCE_THRESH
-	int "Balance threshold in number of interrupts"
-	default 1024
+	int "Balance threshold in percentage of interrupts"
+	default 117
+	range 110 150
 	help
 	  There needs to be a difference of at least this many new interrupts
 	  between the heaviest and least-heavy CPUs during the last polling
 	  window in order for balancing to occur. This is to avoid balancing
 	  when the system is quiet.
 
-	  This threshold is compared to the _scaled_ interrupt counts per CPU;
-	  i.e., the number of interrupts scaled to the CPU's capacity.
+	  This threshold is percentage of the _scaled_ interrupt counts per CPU.
 
 config SBALANCE_EXCLUDE_CPUS
 	string "CPUs to exclude from balancing"
