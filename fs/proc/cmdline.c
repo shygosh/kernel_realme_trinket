@@ -71,6 +71,9 @@ static int __init proc_cmdline_init(void)
 	patch_flag_remove_flag(new_command_line, "rcu_nocbs=");
 	patch_flag_add_flag(new_command_line, "rcu_nocbs=4-7");
 
+	patch_flag_remove_flag(new_command_line, "rcupdate.rcu_expedited");
+	patch_flag_remove_flag(new_command_line, "rcupdate.rcu_normal");
+
 	proc_create("cmdline", 0, NULL, &cmdline_proc_fops);
 	return 0;
 }
