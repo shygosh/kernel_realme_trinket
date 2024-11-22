@@ -12,19 +12,17 @@
 #include <linux/slab.h>
 #include <uapi/linux/sched/types.h>
 
+#define BOOST_DURATION (HZ / 2)
+
 enum {
 	SCREEN_OFF,
-	INPUT_BOOST,
-	MAX_BOOST
+	INPUT_BOOST
 };
 
 struct boost_dev {
 	struct devfreq *df;
 	struct delayed_work input_unboost;
-	struct delayed_work max_unboost;
 	wait_queue_head_t boost_waitq;
-	atomic_long_t max_boost_expires;
-	unsigned long boost_freq;
 	unsigned long state;
 };
 
@@ -34,80 +32,18 @@ struct df_boost_drv {
 };
 
 static void devfreq_input_unboost(struct work_struct *work);
-static void devfreq_max_unboost(struct work_struct *work);
 
-#define BOOST_DEV_INIT(b, dev, freq) .devices[dev] = {				\
+#define BOOST_DEV_INIT(b, dev) .devices[dev] = {				\
 	.input_unboost =							\
 		__DELAYED_WORK_INITIALIZER((b).devices[dev].input_unboost,	\
 					   devfreq_input_unboost, 0),		\
-	.max_unboost =								\
-		__DELAYED_WORK_INITIALIZER((b).devices[dev].max_unboost,	\
-					   devfreq_max_unboost, 0),		\
 	.boost_waitq =								\
-		__WAIT_QUEUE_HEAD_INITIALIZER((b).devices[dev].boost_waitq),	\
-	.boost_freq = freq							\
+		__WAIT_QUEUE_HEAD_INITIALIZER((b).devices[dev].boost_waitq)	\
 }
 
 static struct df_boost_drv df_boost_drv_g __read_mostly = {
-	BOOST_DEV_INIT(df_boost_drv_g, DEVFREQ_CPU_CPU_DDR_BW,
-		       CONFIG_DEVFREQ_CPU_CPU_DDR_BW_BOOST_FREQ)
+	BOOST_DEV_INIT(df_boost_drv_g, DEVFREQ_CPU_CPU_DDR_BW)
 };
-
-static void __devfreq_boost_kick(struct boost_dev *b)
-{
-	if (!READ_ONCE(b->df) || test_bit(SCREEN_OFF, &b->state))
-		return;
-
-	set_bit(INPUT_BOOST, &b->state);
-	if (!mod_delayed_work(system_unbound_wq, &b->input_unboost,
-		msecs_to_jiffies(CONFIG_DEVFREQ_INPUT_BOOST_DURATION_MS))) {
-		/* Set the bit again in case we raced with the unboost worker */
-		set_bit(INPUT_BOOST, &b->state);
-		wake_up(&b->boost_waitq);
-	}
-}
-
-void devfreq_boost_kick(enum df_device device)
-{
-	struct df_boost_drv *d = &df_boost_drv_g;
-
-	__devfreq_boost_kick(&d->devices[device]);
-}
-
-static void __devfreq_boost_kick_max(struct boost_dev *b,
-				     unsigned int duration_ms)
-{
-	unsigned long boost_jiffies, curr_expires, new_expires;
-
-	if (!READ_ONCE(b->df) || test_bit(SCREEN_OFF, &b->state))
-		return;
-
-	boost_jiffies = msecs_to_jiffies(duration_ms);
-	do {
-		curr_expires = atomic_long_read(&b->max_boost_expires);
-		new_expires = jiffies + boost_jiffies;
-
-		/* Skip this boost if there's a longer boost in effect */
-		if (time_after(curr_expires, new_expires))
-			return;
-	} while (atomic_long_cmpxchg(&b->max_boost_expires, curr_expires,
-				     new_expires) != curr_expires);
-
-	set_bit(MAX_BOOST, &b->state);
-	if (!mod_delayed_work(system_unbound_wq, &b->max_unboost,
-			      boost_jiffies)) {
-		/* Set the bit again in case we raced with the unboost worker */
-		set_bit(MAX_BOOST, &b->state);
-		wake_up(&b->boost_waitq);
-	}
-}
-
-void devfreq_boost_kick_max(enum df_device device, unsigned int duration_ms)
-{
-	struct df_boost_drv *d = &df_boost_drv_g;
-
-	__devfreq_boost_kick_max(&d->devices[device], duration_ms);
-}
 
 void devfreq_register_boost_device(enum df_device device, struct devfreq *df)
 {
@@ -128,29 +64,15 @@ static void devfreq_input_unboost(struct work_struct *work)
 	wake_up(&b->boost_waitq);
 }
 
-static void devfreq_max_unboost(struct work_struct *work)
-{
-	struct boost_dev *b = container_of(to_delayed_work(work), typeof(*b),
-					   max_unboost);
-
-	clear_bit(MAX_BOOST, &b->state);
-	wake_up(&b->boost_waitq);
-}
-
 static void devfreq_update_boosts(struct boost_dev *b, unsigned long state)
 {
 	struct devfreq *df = b->df;
 
 	mutex_lock(&df->lock);
-	if (state & BIT(SCREEN_OFF)) {
+	if ((state & BIT(INPUT_BOOST)) && !(state & BIT(SCREEN_OFF)))
+		df->min_freq = df->max_freq;
+	else
 		df->min_freq = df->profile->freq_table[0];
-		df->max_boost = false;
-	} else {
-		df->min_freq = state & BIT(INPUT_BOOST) ?
-			       min(b->boost_freq, df->max_freq) :
-			       df->profile->freq_table[0];
-		df->max_boost = state & BIT(MAX_BOOST);
-	}
 	update_devfreq(df);
 	mutex_unlock(&df->lock);
 }
@@ -195,14 +117,11 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	if (action != MSM_DRM_EARLY_EVENT_BLANK)
 		return NOTIFY_OK;
 
-	/* Boost when the screen turns on and unboost when it turns off */
 	for (i = 0; i < DEVFREQ_MAX; i++) {
 		struct boost_dev *b = &d->devices[i];
 
 		if (*blank == MSM_DRM_BLANK_UNBLANK) {
 			clear_bit(SCREEN_OFF, &b->state);
-			__devfreq_boost_kick_max(b,
-				CONFIG_DEVFREQ_WAKE_BOOST_DURATION_MS);
 		} else {
 			set_bit(SCREEN_OFF, &b->state);
 			wake_up(&b->boost_waitq);
@@ -219,8 +138,18 @@ static void devfreq_boost_input_event(struct input_handle *handle,
 	struct df_boost_drv *d = handle->handler->private;
 	int i;
 
-	for (i = 0; i < DEVFREQ_MAX; i++)
-		__devfreq_boost_kick(&d->devices[i]);
+	for (i = 0; i < DEVFREQ_MAX; i++) {
+		struct boost_dev *b = &d->devices[i];
+		if (!READ_ONCE(b->df) || test_bit(SCREEN_OFF, &b->state))
+			return;
+
+		set_bit(INPUT_BOOST, &b->state);
+		if (!mod_delayed_work(system_unbound_wq, &b->input_unboost, BOOST_DURATION)) {
+			/* Set the bit again in case we raced with the unboost worker */
+			set_bit(INPUT_BOOST, &b->state);
+			wake_up(&b->boost_waitq);
+		}
+	}
 }
 
 static int devfreq_boost_input_connect(struct input_handler *handler,
@@ -271,19 +200,6 @@ static const struct input_device_id devfreq_boost_ids[] = {
 		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
 			BIT_MASK(ABS_MT_POSITION_X) |
 			BIT_MASK(ABS_MT_POSITION_Y) }
-	},
-	/* Touchpad */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_KEYBIT |
-			INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.keybit = { [BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH) },
-		.absbit = { [BIT_WORD(ABS_X)] =
-			BIT_MASK(ABS_X) | BIT_MASK(ABS_Y) }
-	},
-	/* Keypad */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-		.evbit = { BIT_MASK(EV_KEY) }
 	},
 	{ }
 };
