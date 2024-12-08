@@ -49,13 +49,8 @@
 #undef MODULE_PARAM_PREFIX
 #define MODULE_PARAM_PREFIX "adreno."
 
-static bool nopreempt;
-module_param(nopreempt, bool, 0444);
-MODULE_PARM_DESC(nopreempt, "Disable GPU preemption");
-
-static bool swfdetect;
-module_param(swfdetect, bool, 0444);
-MODULE_PARM_DESC(swfdetect, "Enable soft fault detection");
+static const bool nopreempt = false;
+static const bool swfdetect = false;
 
 #define DRIVER_VERSION_MAJOR   3
 #define DRIVER_VERSION_MINOR   1
