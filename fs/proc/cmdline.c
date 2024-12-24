@@ -71,6 +71,8 @@ static int __init proc_cmdline_init(void)
 	patch_flag_remove_flag(new_command_line, "androidboot.verifiedbootstate=");
 	patch_flag_add_flag(new_command_line, "androidboot.verifiedbootstate=green");
 
+	patch_flag_remove_flag(new_command_line, "rcupdate.rcu_expedited=");
+
 	proc_create("cmdline", 0, NULL, &cmdline_proc_fops);
 	return 0;
 }
