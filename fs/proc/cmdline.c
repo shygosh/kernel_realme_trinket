@@ -73,6 +73,16 @@ static int __init proc_cmdline_init(void)
 
 	patch_flag_remove_flag(new_command_line, "rcupdate.rcu_expedited=");
 
+#ifdef CONFIG_NO_HZ_FULL
+	patch_flag_remove_flag(new_command_line, "nohz_full=");
+	patch_flag_add_flag(new_command_line, "nohz_full=1,2,3,5,6,7");
+#endif
+
+#ifdef CONFIG_RCU_NOCB_CPU
+	patch_flag_remove_flag(new_command_line, "rcu_nocbs=");
+	patch_flag_add_flag(new_command_line, "rcu_nocbs=1,2,3,5,6,7");
+#endif
+
 	proc_create("cmdline", 0, NULL, &cmdline_proc_fops);
 	return 0;
 }
