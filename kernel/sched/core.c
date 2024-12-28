@@ -1140,6 +1140,10 @@ static int __set_cpus_allowed_ptr(struct task_struct *p,
 	int ret = 0;
 	cpumask_t allowed_mask;
 
+	if ((p->flags & PF_MISC_MASK) &&
+	    !cpumask_equal(new_mask, cpu_misc_mask))
+		new_mask = cpu_misc_mask;
+
 	rq = task_rq_lock(p, &rf);
 	update_rq_clock(rq);
 
