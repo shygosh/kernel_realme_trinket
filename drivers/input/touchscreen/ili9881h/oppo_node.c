@@ -1077,7 +1077,7 @@ static ssize_t oppo_proc_hopping_write(struct file *filp, const char *buff, size
     }
 	//ipio_info("size = %d, cmd = %s data %d\n", (int)size, cmd[0],data);
 	mutex_lock(&idev->touch_mutex);
-	if (0x00 < temp <= 0x0A) {
+	if (temp > 0x00 && temp <= 0x0A) {
 		ipio_info("enable hopping mode%x\n",temp);
 		idev->hopping= true;
 		ilitek_tddi_ic_func_ctrl("hopping_ctrl", temp);
