@@ -120,7 +120,10 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	// FOREGROUND_APP_ADJ <= crucial <= PERCEPTIBLE_APP_ADJ
 	bool is_crucial = (adj > -1) && (adj < 225);
 
-	valid_mask = is_crucial ? cpu_perf_mask : cpu_lp_mask;
+	if ((p->flags & PF_MISC_MASK))
+		valid_mask = p->cpus_ptr;
+	else
+		valid_mask = is_crucial ? cpu_perf_mask : cpu_lp_mask;
 
 	/*
 	 * Find the best CPU to wake @p on. Although idle_get_state() requires
