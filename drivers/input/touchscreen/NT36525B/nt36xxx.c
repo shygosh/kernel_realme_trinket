@@ -882,7 +882,7 @@ static ssize_t nvt_flash_read(struct file *file, char __user *buff, size_t count
 		goto kzalloc_failed;
 	}
 
-	buf = (uint8_t *)kzalloc((count), GFP_KERNEL | GFP_DMA);
+	buf = (uint8_t *)kzalloc((count), GFP_KERNEL);
 	if(buf == NULL) {
 		NVT_ERR("kzalloc for buf failed!\n");
 		ret = -ENOMEM;
