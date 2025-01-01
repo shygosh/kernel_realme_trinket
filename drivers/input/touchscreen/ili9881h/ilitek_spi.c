@@ -706,7 +706,7 @@ static int ilitek_spi_probe(struct spi_device *spi)
 		}
 		return -ENOMEM;
 	}
-    idev->fw_buf_dma = kzalloc(128 * 1024, GFP_KERNEL | GFP_DMA);
+    idev->fw_buf_dma = kzalloc(128 * 1024, GFP_KERNEL);
     if (idev->fw_buf_dma == NULL) {
         ipio_err("fw kzalloc error\n");
         return -ENOMEM;
