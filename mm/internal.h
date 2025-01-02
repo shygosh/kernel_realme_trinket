@@ -107,7 +107,7 @@ extern unsigned long highest_memmap_pfn;
  * Maximum number of reclaim retries without progress before the OOM
  * killer is consider the only way forward.
  */
-#define MAX_RECLAIM_RETRIES 16
+#define MAX_RECLAIM_RETRIES 32
 
 /*
  * in mm/vmscan.c:
