@@ -1064,6 +1064,8 @@ endif
 
 LDFLAGS	+= -z noexecstack
 LDFLAGS	+= $(call ld-option,--no-warn-rwx-segments)
+LDFLAGS_vmlinux += -z noexecstack
+LDFLAGS_vmlinux	+= $(call ld-option,--no-warn-rwx-segments)
 
 ifeq ($(CONFIG_STRIP_ASM_SYMS),y)
 LDFLAGS_vmlinux	+= $(call ld-option, -X,)
