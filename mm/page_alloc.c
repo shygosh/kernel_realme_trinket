@@ -3581,7 +3581,7 @@ out:
  * Maximum number of compaction retries wit a progress before OOM
  * killer is consider as the only way to move forward.
  */
-#define MAX_COMPACT_RETRIES 16
+#define MAX_COMPACT_RETRIES 32
 
 #ifdef CONFIG_COMPACTION
 /* Try memory compaction for high-order allocations before reclaim */
