@@ -152,6 +152,13 @@ static int minolduid;
 
 static int ngroups_max = NGROUPS_MAX;
 static const int cap_last_cap = CAP_LAST_CAP;
+ 
+#ifdef CONFIG_SCHED_BORE
+extern unsigned int sysctl_sched_burst_penalty_offset;
+extern unsigned int sysctl_sched_burst_penalty_scale;
+static int __maybe_unused sixty_four = 64;
+static int __maybe_unused maxval_12_bits = 4095;
+#endif
 
 /*this is needed for proc_doulongvec_minmax of sysctl_hung_task_timeout_secs */
 #ifdef CONFIG_DETECT_HUNG_TASK
@@ -1382,6 +1389,26 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= perf_event_max_stack_handler,
 		.extra1		= &zero,
 		.extra2		= &one_thousand,
+	},
+#endif
+#ifdef CONFIG_SCHED_BORE
+	{
+		.procname	= "sched_burst_penalty_offset",
+		.data		= &sysctl_sched_burst_penalty_offset,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_douintvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &sixty_four,
+	},
+	{
+		.procname	= "sched_burst_penalty_scale",
+		.data		= &sysctl_sched_burst_penalty_scale,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_douintvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &maxval_12_bits,
 	},
 #endif
 	{

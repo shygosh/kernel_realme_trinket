@@ -19,6 +19,9 @@
  *
  *  Adaptive scheduling granularity, math enhancements by Peter Zijlstra
  *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra
+ *
+ *  Burst-Oriented Response Enhancer (BORE) CPU Scheduler
+ *  Copyright (C) 2021-2024 Masahito Suzuki <firelzrd@gmail.com>
  */
 
 #include <linux/sched/mm.h>
@@ -202,6 +205,67 @@ unsigned int sched_capacity_margin_down[NR_CPUS] = {
 unsigned int sysctl_sched_min_task_util_for_boost = 51;
 /* 0.68ms default for 20ms window size scaled to 1024 */
 unsigned int sysctl_sched_min_task_util_for_colocation = 35;
+#endif
+
+#ifdef CONFIG_SCHED_BORE
+__read_mostly unsigned int sysctl_sched_burst_penalty_offset = 22;
+__read_mostly unsigned int sysctl_sched_burst_penalty_scale = 1280;
+
+/* Forward declaration */
+static inline struct task_struct *task_of(struct sched_entity *se);
+void reweight_task(struct task_struct *p, int prio);
+
+static inline u64 log2plus1_u64_u32f8(u64 v)
+{
+	u64 msb = fls64(v);
+	s64 excess_bits = msb - 9;
+	u64 fractional = (0 <= excess_bits) ? v >> excess_bits : v << -excess_bits;
+	return msb << 8 | fractional;
+}
+
+static inline u64 calc_burst_penalty(u64 burst_time)
+{
+#define MAX_BURST_PENALTY (39ULL << 2)
+	s64 greed = log2plus1_u64_u32f8(burst_time);
+	s64 tolerance = sysctl_sched_burst_penalty_offset << 8;
+	u64 penalty = max_t(s64, 0, greed - tolerance);
+	u64 scaled_penalty = penalty * sysctl_sched_burst_penalty_scale >> 16;
+	return min_t(u64, MAX_BURST_PENALTY, scaled_penalty);
+}
+
+static void update_burst_score(struct sched_entity *se)
+{
+	struct task_struct *p = entity_is_task(se) ? task_of(se) : NULL;
+	u64 prio, prev_prio, new_prio;
+	if (!p) return;
+	prio = p->static_prio - MAX_RT_PRIO;
+	prev_prio = min_t(u64, 39, prio + se->burst_score);
+	se->burst_score = (p->flags & PF_KTHREAD) ? 0 : se->burst_penalty >> 2;
+	new_prio = min_t(u64, 39, prio + se->burst_score);
+	if (new_prio != prev_prio) reweight_task(p, new_prio);
+}
+
+static void update_burst_penalty(struct sched_entity *se)
+{
+	se->curr_burst_penalty = calc_burst_penalty(se->burst_time);
+	se->burst_penalty = max_t(u64, se->prev_burst_penalty, se->curr_burst_penalty);
+	update_burst_score(se);
+}
+
+static inline u64 binary_smooth(u64 new, u64 old)
+{
+	s64 increment = new - old;
+	return (0 <= increment) ? old + (increment >> 1) : old - (-increment >> 1);
+}
+
+static void restart_burst(struct sched_entity *se)
+{
+	se->burst_penalty = se->prev_burst_penalty =
+		binary_smooth(se->curr_burst_penalty, se->prev_burst_penalty);
+	se->curr_burst_penalty = 0;
+	se->burst_time = 0;
+	update_burst_score(se);
+}
 #endif
 
 static inline void update_load_add(struct load_weight *lw, unsigned long inc)
@@ -919,6 +983,11 @@ static void update_curr(struct cfs_rq *cfs_rq)
 
 	curr->sum_exec_runtime += delta_exec;
 	schedstat_add(cfs_rq->exec_clock, delta_exec);
+
+#ifdef CONFIG_SCHED_BORE
+	curr->burst_time += delta_exec;
+	update_burst_penalty(curr);
+#endif
 
 	curr->vruntime += calc_delta_fair(delta_exec, curr);
 	update_min_vruntime(cfs_rq);
@@ -5336,6 +5405,15 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct sched_entity *se = &p->se;
 	int task_sleep = flags & DEQUEUE_SLEEP;
 
+#ifdef CONFIG_SCHED_BORE
+	if (task_sleep) {
+		cfs_rq = cfs_rq_of(se);
+		if (cfs_rq->curr == se)
+			update_curr(cfs_rq);
+		restart_burst(se);
+	}
+#endif
+
 	/*
 	 * The code below (indirectly) updates schedutil which looks at
 	 * the cfs_rq utilization to select a frequency.
@@ -8535,6 +8613,13 @@ static void yield_task_fair(struct rq *rq)
 	struct cfs_rq *cfs_rq = task_cfs_rq(curr);
 	struct sched_entity *se = &curr->se;
 
+#ifdef CONFIG_SCHED_BORE
+	update_rq_clock(rq);
+	update_curr(cfs_rq);
+	rq_clock_skip_update(rq, true);
+	restart_burst(se);
+#endif
+
 	/*
 	 * Are we the only task in the tree?
 	 */
@@ -8543,6 +8628,7 @@ static void yield_task_fair(struct rq *rq)
 
 	clear_buddies(cfs_rq, se);
 
+#ifndef CONFIG_SCHED_BORE
 	if (curr->policy != SCHED_BATCH) {
 		update_rq_clock(rq);
 		/*
@@ -8556,6 +8642,7 @@ static void yield_task_fair(struct rq *rq)
 		 */
 		rq_clock_skip_update(rq, true);
 	}
+#endif
 
 	set_skip_buddy(se);
 }
@@ -11799,6 +11886,9 @@ static void task_fork_fair(struct task_struct *p)
 		update_curr(cfs_rq);
 		se->vruntime = curr->vruntime;
 	}
+#ifdef CONFIG_SCHED_BORE
+	update_burst_score(se);
+#endif
 	place_entity(cfs_rq, se, 1);
 
 	if (sysctl_sched_child_runs_first && curr && entity_before(curr, se)) {

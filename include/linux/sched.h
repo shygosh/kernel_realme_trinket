@@ -507,6 +507,14 @@ struct sched_entity {
 
 	u64				nr_migrations;
 
+#ifdef CONFIG_SCHED_BORE
+	u64				burst_time;
+	u64				prev_burst_penalty;
+	u64				curr_burst_penalty;
+	u64				burst_penalty;
+	u64				burst_score;
+#endif
+
 	struct sched_statistics		statistics;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED

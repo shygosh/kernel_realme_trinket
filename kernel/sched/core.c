@@ -2441,6 +2441,24 @@ int wake_up_state(struct task_struct *p, unsigned int state)
 	return try_to_wake_up(p, state, 0, 1);
 }
 
+#ifdef CONFIG_SCHED_BORE
+static void __init sched_init_bore(void)
+{
+	init_task.se.burst_time = 0;
+	init_task.se.prev_burst_penalty = 0;
+	init_task.se.curr_burst_penalty = 0;
+	init_task.se.burst_penalty = 0;
+	init_task.se.burst_score = 0;
+}
+
+static inline void sched_fork_bore(struct task_struct *p)
+{
+	p->se.burst_time = 0;
+	p->se.curr_burst_penalty = 0;
+	p->se.burst_score = 0;
+}
+#endif
+
 /*
  * Perform scheduler related setup for a newly forked process p.
  * p is forked by current.
@@ -2461,6 +2479,9 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->boost                = 0;
 	p->boost_expires        = 0;
 	p->boost_period         = 0;
+#ifdef CONFIG_SCHED_BORE
+	sched_fork_bore(p);
+#endif
 
 	INIT_LIST_HEAD(&p->se.group_node);
 
@@ -6611,6 +6632,11 @@ void __init sched_init(void)
 {
 	unsigned long alloc_size = 0, ptr;
 	int i;
+
+#ifdef CONFIG_SCHED_BORE
+	sched_init_bore();
+	pr_info("BORE (Burst-Oriented Response Enhancer) CPU Scheduler modification 5.1.0 by Masahito Suzuki\n");
+#endif
 
 	sched_clock_init();
 	wait_bit_init();
