@@ -922,8 +922,8 @@ endif
 endif
 
 ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
-KBUILD_CFLAGS	+= $(call cc-option,-ffunction-sections,)
-KBUILD_CFLAGS	+= $(call cc-option,-fdata-sections,)
+KBUILD_CFLAGS	+= -ffunction-sections
+KBUILD_CFLAGS	+= -fdata-sections
 endif
 
 ifdef CONFIG_LTO_CLANG
@@ -1059,7 +1059,7 @@ KBUILD_LDFLAGS_MODULE += $(LDFLAGS_BUILD_ID)
 LDFLAGS_vmlinux += $(LDFLAGS_BUILD_ID)
 
 ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
-LDFLAGS_vmlinux	+= $(call ld-option, --gc-sections,)
+LDFLAGS_vmlinux	+= --gc-sections
 endif
 
 LDFLAGS	+= -z noexecstack
