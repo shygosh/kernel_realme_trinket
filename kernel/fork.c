@@ -1675,6 +1675,13 @@ static void copy_oom_score_adj(u64 clone_flags, struct task_struct *tsk)
 	mutex_unlock(&oom_adj_mutex);
 }
 
+#ifdef CONFIG_SCHED_BORE
+static void sched_post_fork_bore(struct task_struct *p)
+{
+	p->se.burst_penalty = p->se.prev_burst_penalty;
+}
+#endif
+
 /*
  * This creates a new process as a copy of the old one,
  * but does not actually start it yet.
@@ -2124,6 +2131,9 @@ static __latent_entropy struct task_struct *copy_process(
 	write_unlock_irq(&tasklist_lock);
 
 	proc_fork_connector(p);
+#ifdef CONFIG_SCHED_BORE
+	sched_post_fork_bore(p);
+#endif
 	cgroup_post_fork(p);
 	cgroup_threadgroup_change_end(current);
 	perf_event_fork(p);
