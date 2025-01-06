@@ -6,10 +6,6 @@
         pinctrl-0 = <&gpio_id1_default>;
     };
 
-    oppo_secure_common { //Slave driver and CS ID
-        compatible = "oppo,secure_common"; //Manufacture, and Model
-    };
-
     fpc_fpc1020 { //Slave driver and CS ID
         compatible = "fpc,fpc1020"; //Manufacture, and Model
         fpc,irq-gpio = <&tlmm 92 0x00>;
