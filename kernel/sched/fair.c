@@ -92,8 +92,7 @@ walt_dec_cfs_rq_stats(struct cfs_rq *cfs_rq, struct task_struct *p) {}
  *
  * (default: 6ms * (1 + ilog(ncpus)), units: nanoseconds)
  */
-unsigned int sysctl_sched_latency			= 32000000ULL;
-unsigned int normalized_sysctl_sched_latency		= 32000000ULL;
+static const unsigned long sysctl_sched_latency = 32000000ULL;
 
 /*
  * Enable/disable honoring sync flag in energy-aware wakeups.
@@ -102,39 +101,25 @@ unsigned int sysctl_sched_sync_hint_enable = 1;
 /*
  * Enable/disable using cstate knowledge in idle sibling selection
  */
-const_debug unsigned int sysctl_sched_cstate_aware = 0;
-
-/*
- * The initial- and re-scaling of tunables is configurable
- *
- * Options are:
- *
- *   SCHED_TUNABLESCALING_NONE - unscaled, always *1
- *   SCHED_TUNABLESCALING_LOG - scaled logarithmical, *1+ilog(ncpus)
- *   SCHED_TUNABLESCALING_LINEAR - scaled linear, *ncpus
- *
- * (default SCHED_TUNABLESCALING_LOG = *(1+ilog(ncpus))
- */
-enum sched_tunable_scaling sysctl_sched_tunable_scaling = SCHED_TUNABLESCALING_NONE;
+const unsigned int sysctl_sched_cstate_aware = 0;
 
 /*
  * Minimal preemption granularity for CPU-bound tasks:
  *
  * (default: 0.75 msec * (1 + ilog(ncpus)), units: nanoseconds)
  */
-unsigned int sysctl_sched_min_granularity		= 4000000ULL;
-unsigned int normalized_sysctl_sched_min_granularity	= 4000000ULL;
+static const unsigned long sysctl_sched_min_granularity = 4000000ULL;
 
 /*
  * This value is kept at sysctl_sched_latency/sysctl_sched_min_granularity
  */
-static unsigned int sched_nr_latency = 8;
+static const unsigned long sched_nr_latency = 8;
 
 /*
  * After fork, child runs first. If set to 0 (default) then
  * parent will (try to) run first.
  */
-unsigned int sysctl_sched_child_runs_first __read_mostly;
+static const unsigned long sysctl_sched_child_runs_first = 0;
 
 /*
  * SCHED_OTHER wake-up granularity.
@@ -145,10 +130,9 @@ unsigned int sysctl_sched_child_runs_first __read_mostly;
  *
  * (default: 1 msec * (1 + ilog(ncpus)), units: nanoseconds)
  */
-unsigned int sysctl_sched_wakeup_granularity		= 8000000ULL;
-unsigned int normalized_sysctl_sched_wakeup_granularity	= 8000000ULL;
+static const unsigned long sysctl_sched_wakeup_granularity = 8000000ULL;
 
-const_debug unsigned int sysctl_sched_migration_cost	= 0UL;
+const unsigned int sysctl_sched_migration_cost	= 0UL;
 DEFINE_PER_CPU_READ_MOSTLY(int, sched_load_boost);
 
 #ifdef CONFIG_SCHED_WALT
@@ -179,7 +163,7 @@ int __weak arch_asym_cpu_priority(int cpu)
  *
  * (default: 5 msec, units: microseconds)
  */
-unsigned int sysctl_sched_cfs_bandwidth_slice		= 5000UL;
+static const unsigned long sysctl_sched_cfs_bandwidth_slice = 5000UL;
 #endif
 
 /*
@@ -286,51 +270,8 @@ static inline void update_load_set(struct load_weight *lw, unsigned long w)
 	lw->inv_weight = 0;
 }
 
-/*
- * Increase the granularity value when there are more CPUs,
- * because with more CPUs the 'effective latency' as visible
- * to users decreases. But the relationship is not linear,
- * so pick a second-best guess by going with the log2 of the
- * number of CPUs.
- *
- * This idea comes from the SD scheduler of Con Kolivas:
- */
-static unsigned int get_update_sysctl_factor(void)
-{
-	unsigned int cpus = min_t(unsigned int, num_online_cpus(), 8);
-	unsigned int factor;
-
-	switch (sysctl_sched_tunable_scaling) {
-	case SCHED_TUNABLESCALING_NONE:
-		factor = 1;
-		break;
-	case SCHED_TUNABLESCALING_LINEAR:
-		factor = cpus;
-		break;
-	case SCHED_TUNABLESCALING_LOG:
-	default:
-		factor = 1 + ilog2(cpus);
-		break;
-	}
-
-	return factor;
-}
-
-static void update_sysctl(void)
-{
-	unsigned int factor = get_update_sysctl_factor();
-
-#define SET_SYSCTL(name) \
-	(sysctl_##name = (factor) * normalized_sysctl_##name)
-	SET_SYSCTL(sched_min_granularity);
-	SET_SYSCTL(sched_latency);
-	SET_SYSCTL(sched_wakeup_granularity);
-#undef SET_SYSCTL
-}
-
 void sched_init_granularity(void)
 {
-	update_sysctl();
 }
 
 #define WMULT_CONST	(~0U)
@@ -747,33 +688,6 @@ struct sched_entity *__pick_last_entity(struct cfs_rq *cfs_rq)
 		return NULL;
 
 	return rb_entry(last, struct sched_entity, run_node);
-}
-
-/**************************************************************
- * Scheduling class statistics methods:
- */
-
-int sched_proc_update_handler(struct ctl_table *table, int write,
-		void __user *buffer, size_t *lenp,
-		loff_t *ppos)
-{
-	int ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
-	unsigned int factor = get_update_sysctl_factor();
-
-	if (ret || !write)
-		return ret;
-
-	sched_nr_latency = DIV_ROUND_UP(sysctl_sched_latency,
-					sysctl_sched_min_granularity);
-
-#define WRT_SYSCTL(name) \
-	(normalized_sysctl_##name = sysctl_##name / (factor))
-	WRT_SYSCTL(sched_min_granularity);
-	WRT_SYSCTL(sched_latency);
-	WRT_SYSCTL(sched_wakeup_granularity);
-#undef WRT_SYSCTL
-
-	return 0;
 }
 #endif
 
@@ -11826,15 +11740,11 @@ void trigger_load_balance(struct rq *rq)
 
 static void rq_online_fair(struct rq *rq)
 {
-	update_sysctl();
-
 	update_runtime_enabled(rq);
 }
 
 static void rq_offline_fair(struct rq *rq)
 {
-	update_sysctl();
-
 	/* Ensure any throttled groups are reachable by pick_next_task */
 	unthrottle_offline_cfs_rqs(rq);
 }

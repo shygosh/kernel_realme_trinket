@@ -15,8 +15,8 @@
 
 #include "pelt.h"
 
-int sched_rr_timeslice = RR_TIMESLICE;
-int sysctl_sched_rr_timeslice = (MSEC_PER_SEC * RR_TIMESLICE) / HZ;
+const int sched_rr_timeslice = RR_TIMESLICE;
+const int sysctl_sched_rr_timeslice = (MSEC_PER_SEC * RR_TIMESLICE) / HZ;
 
 static int do_sched_rt_period_timer(struct rt_bandwidth *rt_b, int overrun);
 
@@ -1764,7 +1764,7 @@ static struct task_struct *pick_highest_pushable_task(struct rq *rq, int cpu)
 
 static DEFINE_PER_CPU(cpumask_var_t, local_cpu_mask);
 
-extern const_debug unsigned int sysctl_sched_cstate_aware;
+extern const unsigned int sysctl_sched_cstate_aware;
 
 static int rt_energy_aware_wake_cpu(struct task_struct *task)
 {
@@ -2903,71 +2903,6 @@ static void sched_rt_do_global(void)
 	def_rt_bandwidth.rt_runtime = global_rt_runtime();
 	def_rt_bandwidth.rt_period = ns_to_ktime(global_rt_period());
 	raw_spin_unlock_irqrestore(&def_rt_bandwidth.rt_runtime_lock, flags);
-}
-
-int sched_rt_handler(struct ctl_table *table, int write,
-		void __user *buffer, size_t *lenp,
-		loff_t *ppos)
-{
-	int old_period, old_runtime;
-	static DEFINE_MUTEX(mutex);
-	int ret;
-
-	mutex_lock(&mutex);
-	old_period = sysctl_sched_rt_period;
-	old_runtime = sysctl_sched_rt_runtime;
-
-	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
-
-	if (!ret && write) {
-		ret = sched_rt_global_validate();
-		if (ret)
-			goto undo;
-
-		ret = sched_dl_global_validate();
-		if (ret)
-			goto undo;
-
-		ret = sched_rt_global_constraints();
-		if (ret)
-			goto undo;
-
-		sched_rt_do_global();
-		sched_dl_do_global();
-	}
-	if (0) {
-undo:
-		sysctl_sched_rt_period = old_period;
-		sysctl_sched_rt_runtime = old_runtime;
-	}
-	mutex_unlock(&mutex);
-
-	return ret;
-}
-
-int sched_rr_handler(struct ctl_table *table, int write,
-		void __user *buffer, size_t *lenp,
-		loff_t *ppos)
-{
-	int ret;
-	static DEFINE_MUTEX(mutex);
-
-	mutex_lock(&mutex);
-	ret = proc_dointvec(table, write, buffer, lenp, ppos);
-	/*
-	 * Make sure that internally we keep jiffies.
-	 * Also, writing zero resets the timeslice to default:
-	 */
-	if (!ret && write) {
-		sched_rr_timeslice =
-			sysctl_sched_rr_timeslice <= 0 ? RR_TIMESLICE :
-			msecs_to_jiffies(sysctl_sched_rr_timeslice);
-
-		if (sysctl_sched_rr_timeslice <= 0)
-			sysctl_sched_rr_timeslice = jiffies_to_msecs(RR_TIMESLICE);
-	}
-	mutex_unlock(&mutex);
-	return ret;
 }
 
 #ifdef CONFIG_SCHED_DEBUG

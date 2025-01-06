@@ -52,6 +52,11 @@
 struct rq;
 struct cpuidle_state;
 
+extern const unsigned int sysctl_sched_rt_period;
+extern const int sysctl_sched_rt_runtime;
+extern const int sysctl_sched_rr_timeslice;
+extern const int sched_rr_timeslice;
+
 extern __read_mostly bool sched_predl;
 extern unsigned int sched_capacity_margin_up[NR_CPUS];
 extern unsigned int sched_capacity_margin_down[NR_CPUS];
@@ -1491,16 +1496,6 @@ static inline void __set_task_cpu(struct task_struct *p, unsigned int cpu)
 #endif
 }
 
-/*
- * Tunables that become constants when CONFIG_SCHED_DEBUG is off:
- */
-#ifdef CONFIG_SCHED_DEBUG
-# include <linux/static_key.h>
-# define const_debug __read_mostly
-#else
-# define const_debug const
-#endif
-
 #define sched_feat(x) SCHED_FEAT_##x
 
 extern struct static_key_false sched_numa_balancing;
@@ -1909,9 +1904,9 @@ extern void deactivate_task(struct rq *rq, struct task_struct *p, int flags);
 
 extern void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags);
 
-extern const_debug unsigned int sysctl_sched_time_avg;
-extern const_debug unsigned int sysctl_sched_nr_migrate;
-extern const_debug unsigned int sysctl_sched_migration_cost;
+extern const unsigned int sysctl_sched_time_avg;
+extern const unsigned int sysctl_sched_nr_migrate;
+extern const unsigned int sysctl_sched_migration_cost;
 
 static inline u64 sched_avg_period(void)
 {

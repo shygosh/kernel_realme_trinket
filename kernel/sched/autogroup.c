@@ -9,7 +9,6 @@
 #include <linux/export.h>
 #include <linux/nospec.h>
 
-unsigned int __read_mostly sysctl_sched_autogroup_enabled = 1;
 static struct autogroup autogroup_default;
 static atomic_t autogroup_seq_nr;
 
@@ -197,15 +196,6 @@ void sched_autogroup_exit(struct signal_struct *sig)
 {
 	autogroup_kref_put(sig->autogroup);
 }
-
-static int __init setup_autogroup(char *str)
-{
-	sysctl_sched_autogroup_enabled = 0;
-
-	return 1;
-}
-
-__setup("noautogroup", setup_autogroup);
 
 #ifdef CONFIG_PROC_FS
 
