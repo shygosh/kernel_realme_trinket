@@ -218,10 +218,8 @@ else
 		ld-name = bfd
 	endif
 endif
-ifeq ($(LD),)
 ifneq ($(LLVM),)
 	ld-name = lld
-endif
 endif
 
 # ld-version
