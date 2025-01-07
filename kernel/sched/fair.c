@@ -197,7 +197,7 @@ static const unsigned long sysctl_sched_burst_penalty_scale = 1600;
 
 /* Forward declaration */
 static inline struct task_struct *task_of(struct sched_entity *se);
-void reweight_task(struct task_struct *p, int prio);
+__always_inline void reweight_task(struct task_struct *p, int prio);
 
 static inline u64 log2plus1_u64_u32f8(u64 v)
 {
@@ -2879,7 +2879,7 @@ static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
 	}
 }
 
-void reweight_task(struct task_struct *p, int prio)
+__always_inline void reweight_task(struct task_struct *p, int prio)
 {
 	struct sched_entity *se = &p->se;
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
