@@ -4767,11 +4767,6 @@ int dsi_panel_enable(struct dsi_panel *panel)
 		return -EINVAL;
 	}
 
-#ifdef CONFIG_VENDOR_EDIT
-/* Gou shengjun@PSW.MM.Display.Lcd.Stability, 2018-05-31,add to mark power states*/
-	pr_err("%s\n", __func__);
-#endif
-
 	mutex_lock(&panel->panel_lock);
 
 	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_ON);
@@ -4911,13 +4906,6 @@ int dsi_panel_disable(struct dsi_panel *panel)
 		pr_err("invalid params\n");
 		return -EINVAL;
 	}
-
-#ifdef CONFIG_VENDOR_EDIT
-/* Gou shengjun@PSW.MM.Display.Lcd.Stability, 2018-11-21
- * Add to mark power states
-*/
-	pr_err("%s\n", __func__);
-#endif
 
 	mutex_lock(&panel->panel_lock);
 
