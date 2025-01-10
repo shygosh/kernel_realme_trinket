@@ -689,6 +689,7 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 /**
  * cpufreq_per_cpu_attr_write() / store_##file_name() - sysfs write access
  */
+#if 0
 #define store_one(file_name, object)			\
 static ssize_t store_##file_name					\
 (struct cpufreq_policy *policy, const char *buf, size_t count)		\
@@ -714,6 +715,14 @@ static ssize_t store_##file_name					\
 									\
 	return ret ? ret : count;					\
 }
+#else
+#define store_one(file_name, object)			\
+static ssize_t store_##file_name					\
+(struct cpufreq_policy *policy, const char *buf, size_t count)		\
+{									\
+	return count;							\
+}
+#endif
 
 store_one(scaling_min_freq, min);
 store_one(scaling_max_freq, max);
@@ -2211,6 +2220,10 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 {
 	struct cpufreq_governor *old_gov;
 	int ret;
+
+	if (new_policy->min != policy->cpuinfo.min_freq ||
+	    new_policy->max != policy->cpuinfo.max_freq)
+		return -EINVAL;
 
 	pr_debug("setting new policy for CPU %u: %u - %u kHz\n",
 		 new_policy->cpu, new_policy->min, new_policy->max);
