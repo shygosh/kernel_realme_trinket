@@ -1274,7 +1274,7 @@ sd_init(struct sched_domain_topology_level *tl,
 		.busy_factor		= 32,
 		.imbalance_pct		= 125,
 		.cache_nice_tries	= 0,
-		.flags			= 1*SD_LOAD_BALANCE
+		.flags			= 0*SD_LOAD_BALANCE
 					| 1*SD_BALANCE_NEWIDLE
 					| 1*SD_BALANCE_EXEC
 					| 1*SD_BALANCE_FORK
