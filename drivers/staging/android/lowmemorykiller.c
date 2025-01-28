@@ -218,22 +218,6 @@ static struct notifier_block lmk_vmpr_nb = {
 	.notifier_call = lmk_vmpressure_notifier,
 };
 
-static int test_task_flag(struct task_struct *p, int flag)
-{
-	struct task_struct *t;
-
-	for_each_thread(p, t) {
-		task_lock(t);
-		if (test_tsk_thread_flag(t, flag)) {
-			task_unlock(t);
-			return 1;
-		}
-		task_unlock(t);
-	}
-
-	return 0;
-}
-
 static int test_task_state(struct task_struct *p, int state)
 {
 	struct task_struct *t;
@@ -524,10 +508,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		if (tsk->flags & PF_KTHREAD)
 			continue;
 
-		/* if task no longer has any memory ignore it */
-		if (test_task_flag(tsk, TIF_MM_RELEASED))
-			continue;
-
 		if (oom_reaper) {
 			p = find_lock_task_mm(tsk);
 			if (!p)
@@ -644,7 +624,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 
 		lowmem_deathpending_timeout = jiffies + HZ;
 		rem += selected_tasksize;
-		rcu_read_unlock();
 		/* give the system time to free up the memory */
 		msleep_interruptible(20);
 		trace_almk_shrink(selected_tasksize, ret,
@@ -652,11 +631,11 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 				  selected_oom_score_adj);
 	} else {
 		trace_almk_shrink(1, ret, other_free, other_file, 0);
-		rcu_read_unlock();
 	}
 
 	lowmem_print(4, "%s %lu, %x, return %lu\n",
 		     __func__, sc->nr_to_scan, sc->gfp_mask, rem);
+	rcu_read_unlock();
 	if (lock_required)
 		mutex_unlock(&scan_mutex);
 	return rem;
