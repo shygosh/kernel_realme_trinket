@@ -36,11 +36,6 @@
 static const unsigned int vmpressure_level_med = 60;
 static const unsigned int vmpressure_level_critical = 95;
 
-static unsigned long vmpressure_scale_max = 100;
-
-/* vmpressure values >= this will be scaled based on allocstalls */
-static unsigned long allocstall_threshold = 70;
-
 static struct vmpressure global_vmpressure;
 static BLOCKING_NOTIFIER_HEAD(vmpressure_notifier);
 
@@ -166,19 +161,6 @@ out:
 		 scanned, reclaimed);
 
 	return pressure;
-}
-
-static unsigned long vmpressure_account_stall(unsigned long pressure,
-				unsigned long stall, unsigned long scanned)
-{
-	unsigned long scale;
-
-	if (pressure < allocstall_threshold)
-		return pressure;
-
-	scale = ((vmpressure_scale_max - pressure) * stall) / scanned;
-
-	return pressure + scale;
 }
 
 struct vmpressure_event {
@@ -409,7 +391,6 @@ static void vmpressure_global(gfp_t gfp, unsigned long scanned, bool critical,
 
 	if (scanned) {
 		pressure = vmpressure_calc_pressure(scanned, reclaimed);
-		pressure = vmpressure_account_stall(pressure, stall, scanned);
 	} else {
 		pressure = 100;
 	}
