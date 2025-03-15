@@ -2432,6 +2432,10 @@ const struct cpumask *const cpu_perf_mask = cpu_possible_mask;
 #endif
 EXPORT_SYMBOL(cpu_perf_mask);
 
+static const unsigned long slave_cpu_bits = CONFIG_LITTLE_CPU_MASK + 2;
+const struct cpumask *const cpu_slave_mask = to_cpumask(&slave_cpu_bits);
+EXPORT_SYMBOL(cpu_slave_mask);
+
 void init_cpu_present(const struct cpumask *src)
 {
 	cpumask_copy(&__cpu_present_mask, src);

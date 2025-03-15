@@ -52,6 +52,17 @@ bool kthread_is_per_cpu(struct task_struct *k);
 	__k;								   \
 })
 
+#define kthread_run_slave(threadfn, data, namefmt, ...)		   \
+({									   \
+	struct task_struct *__k						   \
+		= kthread_create(threadfn, data, namefmt, ## __VA_ARGS__); \
+	if (!IS_ERR(__k)) {						   \
+		wake_up_process(__k);					   \
+		kthread_bind_mask(__k, cpu_slave_mask);			   \
+	}								   \
+	__k;								   \
+})
+
 void free_kthread_struct(struct task_struct *k);
 void kthread_bind(struct task_struct *k, unsigned int cpu);
 void kthread_bind_mask(struct task_struct *k, const struct cpumask *mask);
