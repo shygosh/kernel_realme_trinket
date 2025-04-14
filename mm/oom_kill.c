@@ -632,12 +632,15 @@ void wake_oom_reaper(struct task_struct *tsk)
 
 static int __init oom_init(void)
 {
+#ifndef CONFIG_ANDROID_SIMPLE_LMK
 	oom_reaper_th = kthread_run(oom_reaper, NULL, "oom_reaper");
 	if (IS_ERR(oom_reaper_th)) {
 		pr_err("Unable to start OOM reaper %ld. Continuing regardless\n",
 				PTR_ERR(oom_reaper_th));
 		oom_reaper_th = NULL;
 	}
+#endif
+
 	return 0;
 }
 subsys_initcall(oom_init)
