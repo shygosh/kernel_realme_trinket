@@ -925,6 +925,7 @@ endif
 ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 KBUILD_CFLAGS	+= -ffunction-sections
 KBUILD_CFLAGS	+= -fdata-sections
+KBUILD_CFLAGS	+= -Wl,--gc-sections
 endif
 
 ifdef CONFIG_LTO_CLANG
