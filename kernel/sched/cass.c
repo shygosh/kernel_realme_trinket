@@ -116,16 +116,14 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	} else 
 		cpumask_copy(valid_mask, p->cpus_ptr);
 
-	/*
-	 * Check if this CPU is idle or only has SCHED_IDLE tasks. For
-	 * sync wakes, always treat the current CPU as idle.
-	 */
-	for_each_cpu_and(cpu, valid_mask, cpu_active_mask) {
-		struct rq *rq = cpu_rq(cpu);
-		if ((sync && cpu == this_cpu && rq->nr_running == 1) ||
-		    (idle_cpu(cpu) && !cpu_isolated(cpu)))
+	/* Check if this CPU is idle or only has SCHED_IDLE tasks. */
+	for_each_cpu_and(cpu, valid_mask, cpu_active_mask)
+		if (idle_cpu(cpu) && !cpu_isolated(cpu))
 			return cpu;
-	}
+
+	/* For sync wakes, always treat the current CPU as idle. */
+	if (sync && cpu_rq(this_cpu)->nr_running == 1)
+		return this_cpu;
 
 	/*
 	 * Note: @curr->cpu must be initialized before this loop ends. This is
