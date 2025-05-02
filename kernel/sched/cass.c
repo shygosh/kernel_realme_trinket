@@ -103,7 +103,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 	struct cass_cpu_cand cands[2], *best = cands;
 	int this_cpu = raw_smp_processor_id();
 	unsigned long p_util = rt ? 0 : task_util_est(p);
-	int cidx = 0, cpu;
+	int cidx = 0, cpu = 0, p_cpu = task_cpu(p);
 	struct cpumask *valid_mask = this_cpu_cpumask_var_ptr(select_idle_mask);
 
 	/* Place critical tasks on perf cpus and vice versa */
@@ -144,7 +144,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync, bool rt
 		 * find what this CPU's relative utilization would look like
 		 * if @p were on it.
 		 */
-		if (cpu != task_cpu(p))
+		if (cpu != p_cpu)
 			curr->util += p_util;
 
 		/* Calculate the relative utilization for this CPU candidate */
