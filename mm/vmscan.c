@@ -2819,7 +2819,7 @@ static bool age_lruvec(struct lruvec *lruvec, struct scan_control *sc,
 }
 
 /* to protect the working set of the last N jiffies */
-static unsigned long lru_gen_min_ttl __read_mostly = HZ * 5; // 5 seconds
+static unsigned long lru_gen_min_ttl __read_mostly = HZ * 2;
 
 #ifdef CONFIG_ANDROID_SIMPLE_LMK
 void simple_lmk_needs_reclaim(void);
